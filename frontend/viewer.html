@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Match Viewer – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
+    #grid { border: 1px solid #333; }
+    #controls { margin-top: 10px; }
+    #legend { margin-top: 15px; font-size: 20px; }
+    #layout { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:10px; }
+    #right-panel { width: 320px; max-height: 620px; overflow:auto; text-align:left; border:1px solid #ddd; padding:8px; border-radius:6px; }
+    #log { font-family: monospace; font-size: 13px; }
+    .log-turn { margin:6px 0; cursor: pointer; }
+    .log-turn { border:1px solid #e5e7eb; padding:6px 8px; border-radius:6px; background:#fafafa; }
+    .log-turn:hover { background:#f3f4f6; }
+    .highlight { box-shadow: 0 0 0 3px rgba(59,130,246,0.6) inset; }
+    #bot-info { font-size: 14px; margin-bottom:8px; }
+    #extra-controls button { margin: 0 4px; }
+  </style>
+</head>
+<body>
+  <h1>Match Viewer</h1>
+  <div id="layout">
+    <div>
+      <canvas id="grid" width="600" height="600"></canvas>
+      <div id="info"></div>
+      <div id="controls">
+        <button id="play">Play</button>
+        <button id="pause">Pause</button>
+        <button id="speed1">⏪ 1x</button>
+        <button id="speed2">⏩ 2x</button>
+        <button id="speed4">⚡ 4x</button>
+        <input type="range" id="slider" min="0" value="0" style="width:60%;">
+      </div>
+      <div id="extra-controls" style="margin-top:6px;">
+        <button id="back1">◀︎ -1</button>
+        <button id="back5">⏮ -5</button>
+        <button id="fwd1">+1 ▶︎</button>
+        <button id="fwd5">+5 ⏭</button>
+        <button id="nextEvent">Next Event</button>
+        <button id="reverse">Reverse ⤿</button>
+        <button id="snapshot">Copy Snapshot Link</button>
+      </div>
+      <div id="legend"></div>
+    </div>
+    <div id="right-panel">
+      <div id="bot-info"><strong>Click a bot to highlight and view stats.</strong></div>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const matchId = params.get('id');
+    const startTurnParam = parseInt(params.get('turn') || '0', 10);
+    if (!matchId) {
+      document.getElementById('info').textContent = 'Missing ?id= parameter in URL';
+      throw new Error('match id required');
+    }
+
+    const isUrl = matchId.startsWith('http://') || matchId.startsWith('https://');
+
+    const GRID_CANVAS = document.getElementById('grid');
+    const ctx = GRID_CANVAS.getContext('2d');
+    let gridSize = 10; // default; will update after metadata fetch
+    const cellPixels = () => GRID_CANVAS.width / gridSize;
+
+    let frames = [];
+    let tick = 0;
+    let playing = false;
+    let timer = null;
+    let interval = 500; // ms, adjusted by speed buttons
+    let lastHP = {};
+    let reverseMode = false;
+    let selectedBotId = null;
+    let teamsMeta = [];
+
+    const ROLE_ICON = { sn: '🎯', ta: '🛡️', bo: '💣', sc: '🏃', te: '✨' };
+    const ROLE_COLOR = { sn: '#e74c3c', ta: '#3498db', sc: '#2ecc71', bo: '#f59e0b', te: '#9b59b6' };
+
+    function friendlyName(botId){
+      // botId format: <teamPrefix>-<roleCode>
+      const [prefix, role] = botId.split('-');
+      const team = teamsMeta.find(t=>t.prefix===prefix);
+      const teamName = team? team.name : prefix;
+      const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role] || role;
+      return `${teamName} ${roleName}`;
+    }
+
+    // build legend
+    const legendDiv = document.getElementById('legend');
+    legendDiv.innerHTML = Object.entries({sn:'Sniper',ta:'Tank',bo:'Bomber',sc:'Scout',te:'Teleporter'})
+      .map(([code,label])=>`<span style="margin-right:15px;">${ROLE_ICON[code]} – ${label}</span>`).join('');
+
+    document.getElementById('play').onclick = () => { playing = true; loop(); };
+    document.getElementById('pause').onclick = () => { playing = false; clearTimeout(timer); };
+    document.getElementById('speed1').onclick = ()=>{ interval=500; };
+    document.getElementById('speed2').onclick = ()=>{ interval=250; };
+    document.getElementById('speed4').onclick = ()=>{ interval=125; };
+    document.getElementById('back1').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.max(0,tick-1); render(); };
+    document.getElementById('back5').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.max(0,tick-5); render(); };
+    document.getElementById('fwd1').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.min(frames.length-1,tick+1); render(); };
+    document.getElementById('fwd5').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.min(frames.length-1,tick+5); render(); };
+    document.getElementById('nextEvent').onclick = ()=>{
+      playing=false; clearTimeout(timer);
+      for (let i=tick+1;i<frames.length;i++){
+        const ev = frames[i].events||[];
+        if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { tick=i; render(); return; }
+      }
+    };
+    document.getElementById('reverse').onclick = ()=>{ reverseMode = !reverseMode; };
+    document.getElementById('snapshot').onclick = ()=>{
+      const url = `${location.origin}${location.pathname}?id=${encodeURIComponent(matchId)}&turn=${tick}`;
+      navigator.clipboard.writeText(url).then(()=>{ alert('Snapshot link copied!'); });
+    };
+
+    async function fetchLog(logPath) {
+      const res = await fetch(logPath);
+      frames = await res.json();
+      // infer grid size if not set by metadata
+      let maxCoord = 0;
+      frames.forEach(f => {
+        Object.values(f.positions).forEach(([x, y]) => { maxCoord = Math.max(maxCoord, x, y); });
+      });
+      gridSize = maxCoord >= 10 ? 15 : 10;
+    }
+
+    function drawGrid() {
+      ctx.clearRect(0, 0, GRID_CANVAS.width, GRID_CANVAS.height);
+      const px = cellPixels();
+      ctx.strokeStyle = '#ccc';
+      for (let i = 0; i <= gridSize; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * px, 0);
+        ctx.lineTo(i * px, GRID_CANVAS.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * px);
+        ctx.lineTo(GRID_CANVAS.width, i * px);
+        ctx.stroke();
+      }
+    }
+
+    function drawBots(frame) {
+      const px = cellPixels();
+      // choose deterministic color per team
+      const teamColors = {};
+      let colorIdx = 0;
+      for (const botId in frame.positions) {
+        const teamId = botId.split('-')[0];
+        if (!teamColors[teamId]) {
+          const palette = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6'];
+          teamColors[teamId] = palette[colorIdx % palette.length];
+          colorIdx++;
+        }
+      }
+      // trails for selected bot: last 3 positions
+      if (selectedBotId) {
+        const path = [];
+        for (let i = Math.max(0, tick-3); i <= tick; i++) {
+          const f = frames[i];
+          if (f && f.positions[selectedBotId]) path.push(f.positions[selectedBotId]);
+        }
+        if (path.length >= 2) {
+          ctx.strokeStyle = 'rgba(59,130,246,0.8)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          const [sx, sy] = path[0];
+          ctx.moveTo((sx+0.5)*px, (sy+0.5)*px);
+          for (let k=1;k<path.length;k++) {
+            const [x,y] = path[k];
+            ctx.lineTo((x+0.5)*px, (y+0.5)*px);
+          }
+          ctx.stroke();
+        }
+      }
+      for (const [botId, pos] of Object.entries(frame.positions)) {
+        const [x, y] = pos;
+        const teamId = botId.split('-')[0];
+        // base fill by team color
+        ctx.fillStyle = teamColors[teamId];
+        ctx.beginPath();
+        ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3, 0, Math.PI * 2);
+        ctx.fill();
+        // shield glow
+        const shieldTurns = frame.shields?.[botId] ?? 0;
+        if (shieldTurns > 0) {
+          ctx.strokeStyle = 'rgba(59,130,246,0.9)';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3 + 5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        // selected highlight ring
+        if (selectedBotId === botId) {
+          ctx.strokeStyle = 'rgba(34,197,94,0.9)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3 + 8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        // health bar
+        const hp = frame.hp[botId];
+        const barW = px*0.6;
+        const barH = 4;
+        const barX = (x+0.5)*px - barW/2;
+        const barY = (y+0.5)*px + px/3;
+        ctx.fillStyle = '#e5e7eb';
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.fillStyle = '#22c55e';
+        ctx.fillRect(barX, barY, barW*(hp/100), barH);
+        // damage flash
+        const prev = lastHP[botId] ?? hp;
+        if(prev > hp){
+          ctx.fillStyle = 'rgba(239,68,68,0.6)';
+          ctx.beginPath();
+          ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // draw role icon colored by role
+        const roleCode = botId.split('-')[1];
+        ctx.font = `${px/2}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = ROLE_COLOR[roleCode] || '#000';
+        ctx.fillText(ROLE_ICON[roleCode] || '?', (x+0.5)*px, (y+0.5)*px);
+      }
+      lastHP = frame.hp;
+
+      // action visuals
+      if(frame.actions){
+        Object.entries(frame.actions).forEach(([bid,act])=>{
+          const pos = frame.positions[bid];
+          if(!pos) return;
+          const px=cellPixels();
+          const sx=(pos[0]+0.5)*px, sy=(pos[1]+0.5)*px;
+          if(act.type==='attack'){
+            const dirDelta={north:[0,-1],south:[0,1],east:[1,0],west:[-1,0]}[act.direction];
+            const tx=sx+dirDelta[0]*px, ty=sy+dirDelta[1]*px;
+            ctx.strokeStyle='red'; ctx.lineWidth=2;
+            ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();
+          }else if(act.type==='snipe'){
+            const [tx,ty]=[act.target[0]*px+px/2, act.target[1]*px+px/2];
+            ctx.strokeStyle='orange';ctx.setLineDash([4,4]);ctx.lineWidth=2;
+            ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();ctx.setLineDash([]);
+          }else if(act.type==='explode'){
+            ctx.fillStyle='rgba(255,115,0,0.3)';
+            ctx.beginPath();ctx.arc(sx,sy,px*1.2,0,Math.PI*2);ctx.fill();
+          }else if(act.type==='shield'){
+            ctx.strokeStyle='blue';ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy,px/3+4,0,Math.PI*2);ctx.stroke();
+          }
+        });
+      }
+    }
+
+    function render() {
+      drawGrid();
+      const frame = frames[tick];
+      if (frame) {
+        drawBots(frame);
+        document.getElementById('info').textContent = `Turn ${frame.turn+1}/${frames.length}`;
+        document.getElementById('slider').value=tick;
+        // update bot info panel if selected
+        if (selectedBotId) {
+          const hp = frame.hp?.[selectedBotId] ?? '-';
+          const cd = frame.cooldowns?.[selectedBotId] ?? '-';
+          const sh = frame.shields?.[selectedBotId] ?? 0;
+          document.getElementById('bot-info').textContent = `Bot ${friendlyName(selectedBotId)} | HP: ${hp} | Power CD: ${cd} | Shield: ${sh}`;
+        }
+      }
+    }
+
+    function loop() {
+      if (!playing) return;
+      render();
+      const len = frames.length;
+      tick = (tick + (reverseMode? -1: 1) + len) % len;
+      timer = setTimeout(loop, interval);
+    }
+
+    function buildLog() {
+      const logDiv = document.getElementById('log');
+      const frag = document.createDocumentFragment();
+      frames.forEach((f, idx) => {
+        const container = document.createElement('div');
+        container.className = 'log-turn';
+        const title = document.createElement('div');
+        title.innerHTML = `<strong>Turn ${idx+1}</strong>`;
+        container.appendChild(title);
+        const evs = f.events || [];
+        if (evs.length > 0) {
+          const ul = document.createElement('ul');
+          ul.style.margin = '4px 0 8px 16px';
+          ul.style.padding = '0';
+          evs.forEach(e => {
+            // replace raw ids with friendly names if present
+            let text = e.replace(/\b([0-9a-f]{6})-(sn|ta|bo|sc|te)\b/gi, (m, pfx, role)=>{
+              const tm = teamsMeta.find(t=>t.prefix===pfx);
+              const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role]||role;
+              return `${tm?tm.name:pfx} ${roleName}`;
+            });
+            const li = document.createElement('li'); li.textContent = text; ul.appendChild(li);
+          });
+          container.appendChild(ul);
+        }
+        container.onclick = () => { playing=false; clearTimeout(timer); tick = idx; render(); };
+        frag.appendChild(container);
+      });
+      logDiv.innerHTML='';
+      logDiv.appendChild(frag);
+    }
+
+    function nearestBotIdAtCanvas(x, y) {
+      const rect = GRID_CANVAS.getBoundingClientRect();
+      const cx = x - rect.left; const cy = y - rect.top;
+      const px = cellPixels();
+      const fx = cx / px - 0.5; const fy = cy / px - 0.5;
+      const frame = frames[tick];
+      let best=null, bestd=1e9;
+      for (const [bid, pos] of Object.entries(frame.positions)){
+        const [bx,by]=pos;
+        const dx = bx - fx, dy = by - fy;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < bestd) { best=bid; bestd=d2; }
+      }
+      // radius threshold ~ bot circle
+      if (best != null && Math.sqrt(bestd) < 0.5) return best; else return null;
+    }
+
+    GRID_CANVAS.addEventListener('click', (e)=>{
+      const bid = nearestBotIdAtCanvas(e.clientX, e.clientY);
+      if (bid) { selectedBotId = bid; render(); }
+    });
+
+    (async function init() {
+      try {
+        const metaRes = await fetch(`http://localhost:8000/matches/${matchId}`);
+        const meta = await metaRes.json();
+        if (meta.status !== 'finished') {
+          document.getElementById('info').textContent = `Match still ${meta.status}. Refresh later.`;
+          return;
+        }
+        gridSize = meta.mode === 'duo' ? 10 : 15;
+        teamsMeta = (meta.teams||[]);
+
+        await fetchLog(`http://localhost:8000/matches/${matchId}/log`);
+        // set slider max
+        document.getElementById('slider').max = frames.length-1;
+        // slider drag handler
+        document.getElementById('slider').oninput = (e)=>{
+          playing=false; clearTimeout(timer);
+          tick = parseInt(e.target.value);
+          render();
+        };
+        // build action log
+        buildLog();
+        // start turn from URL if provided
+        if (!Number.isNaN(startTurnParam) && startTurnParam >=0 && startTurnParam < frames.length) {
+          tick = startTurnParam;
+        }
+        drawGrid();
+        document.getElementById('info').textContent = 'Loaded. Press Play.';
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  </script>
+</body>
+</html> 

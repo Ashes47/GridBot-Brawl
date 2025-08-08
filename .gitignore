@@ -1,0 +1,7 @@
+.cursor/
+.env
+
+__pycache__/
+.cursorignore
+
+/data/

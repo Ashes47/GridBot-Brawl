@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    env_file:
+      - .env
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - botnet
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      - ./data/teams:/app/data/teams
+      - ./data/matches:/app/data/matches
+    networks:
+      - botnet
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./sample_bots:/usr/share/nginx/html/sample_bots
+    depends_on:
+      - backend
+    networks:
+      - botnet
+
+networks:
+  botnet:
+    driver: bridge
+
+volumes:
+  db_data: 

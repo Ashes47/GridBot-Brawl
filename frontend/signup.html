@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Signup – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+    label { display: block; margin-top: 12px; }
+    input[type="text"], input[type="file"] { width: 100%; padding: 8px; }
+    button { margin-top: 20px; padding: 10px 16px; }
+  </style>
+</head>
+<body>
+  <h1>Team Signup</h1>
+  <form id="signup-form" action="http://localhost:8000/teams" method="post" enctype="multipart/form-data">
+    <label>Team Name
+      <input type="text" name="name" required>
+    </label>
+
+    <label>Members (comma-separated)
+      <input type="text" name="members" placeholder="Alice,Bob,Charlie" required>
+    </label>
+
+    <label>Password (for future updates)
+      <input type="password" name="password" minlength="6" required>
+    </label>
+
+    <label>Bot File (.py with 5 bot classes)
+      <input type="file" name="bot_file" accept=".py" required>
+    </label>
+
+    <button type="submit">Register Team</button>
+  </form>
+
+  <p id="result"></p>
+
+  <script>
+    // Intercept form submission to show result without leaving page
+    const form = document.getElementById('signup-form');
+    const resultEl = document.getElementById('result');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Error');
+        resultEl.innerHTML = `<strong>Success!</strong> Redirecting to team page…`;
+        // Redirect to team page where they can test vs baseline and later submit
+        window.location.href = `team.html?id=${data.id}`;
+      } catch (err) {
+        resultEl.textContent = 'Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html> 

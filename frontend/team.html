@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Dashboard – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background: #f5f5f5; }
+    .badge { padding:2px 6px; border-radius:4px; font-size:12px; color:#fff; }
+    .win { background:#22c55e; }
+    .loss { background:#ef4444; }
+    .draw { background:#facc15; color:#000; }
+    .pill { padding:2px 6px; border-radius:12px; background:#e5e7eb; margin-right:4px; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h1 id="team-name">Team</h1>
+  <div id="components"></div>
+  <div style="margin:10px 0;">
+    <button id="test-baseline">▶ Test vs Baseline</button>
+    <span id="test-status" style="margin-left:8px;color:#555;"></span>
+  </div>
+
+  <h3>Duo Matches</h3>
+  <table id="duo-table">
+    <thead>
+      <tr><th>#</th><th>Outcome</th><th>Opponents</th><th>HP Left</th><th>DMG Done</th><th>Replay</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>Quad Matches</h3>
+  <table id="quad-table" style="margin-top:20px;">
+    <thead>
+      <tr><th>#</th><th>Outcome</th><th>Opponents</th><th>HP Left</th><th>DMG Done</th><th>Replay</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3 style="margin-top:24px;">Baseline Tests</h3>
+  <table id="baseline-table">
+    <thead>
+      <tr><th>#</th><th>Outcome</th><th>Opponents</th><th>HP Left</th><th>DMG Done</th><th>Replay</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div style="text-align:right;margin-bottom:10px;">
+    <button id="reset-btn" style="background:#ef4444;">Admin Reset Password</button>
+    <button id="delete-btn" style="background:#ef4444; margin-left: 10px;">Admin Delete Team</button>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const teamId = params.get('id');
+    if (!teamId) {
+      document.body.innerHTML = '<p>Missing ?id=TEAM_ID parameter</p>';
+      throw new Error('missing id');
+    }
+
+    async function fetchTeam() {
+      const r = await fetch(`http://localhost:8000/teams/${teamId}`);
+      return await r.json();
+    }
+    async function fetchMatches() {
+      const r = await fetch(`http://localhost:8000/teams/${teamId}/matches`);
+      return await r.json();
+    }
+    function shorten(id) { return id.slice(0,6)+'…'; }
+
+    (async function init() {
+      const team = await fetchTeam();
+      document.getElementById('team-name').textContent = team.name;
+
+      const matches = await fetchMatches();
+
+      // component pills
+      const compDiv = document.getElementById('components');
+      const comps = ['Sniper','Tank','Bomber','Scout','Teleporter'];
+      comps.forEach(c=>{
+        const span=document.createElement('span'); span.className='pill'; span.textContent=c; compDiv.appendChild(span);});
+
+      const duoBody = document.querySelector('#duo-table tbody');
+      const quadBody = document.querySelector('#quad-table tbody');
+      const baseBody = document.querySelector('#baseline-table tbody');
+      let d=1,q=1;
+      let b=1;
+      matches.forEach((m) => {
+        const tr=document.createElement('tr');
+        const badge=`<span class="badge ${m.outcome}">${m.outcome.toUpperCase()}</span>`;
+        const oppText = (m.opponent_names && m.opponent_names.length) ? m.opponent_names.join(', ') : m.opponents.map(shorten).join(', ');
+        tr.innerHTML=`<td>${m.is_baseline ? b++ : (m.mode==='duo'?d++:q++)}</td><td>${badge}</td><td>${oppText}</td><td>${m.hp_left}</td><td>${m.damage_done ?? 0}</td><td><a href="viewer.html?id=${m.match_id}" target="_blank">🔗</a></td>`;
+        if (m.is_baseline) baseBody.appendChild(tr); else (m.mode==='duo'?duoBody:quadBody).appendChild(tr);
+      });
+      document.getElementById('reset-btn').onclick = async ()=>{
+        const adminPass = prompt('Enter admin password');
+        if(!adminPass) return;
+        const newPass = prompt('Enter new team password (min 6 chars)');
+        if(!newPass) return;
+        const form = new FormData();
+        form.append('admin_password', adminPass);
+        form.append('new_password', newPass);
+        const res = await fetch(`http://localhost:8000/teams/${teamId}/reset_password`, {method:'POST', body:form});
+        if(res.ok) alert('Password reset'); else alert('Failed: '+(await res.text()));
+      };
+      document.getElementById('delete-btn').onclick = async () => {
+        const adminPass = prompt('Enter admin password to delete team');
+        if (!adminPass) return;
+        if (!confirm('Are you sure you want to delete this team? This cannot be undone.')) return;
+        
+        const form = new FormData();
+        form.append('admin_password', adminPass);
+        
+        const res = await fetch(`http://localhost:8000/teams/${teamId}`, { method: 'DELETE', body: form });
+        if (res.ok) {
+          alert('Team deleted');
+          window.location.href = 'teams.html';
+        } else {
+          alert('Failed: ' + (await res.text()));
+        }
+      };
+      // page already populated above; no extra call
+
+      // Test vs Baseline
+      document.getElementById('test-baseline').onclick = async () => {
+        const statusEl = document.getElementById('test-status');
+        statusEl.textContent = 'Queuing match…';
+        try {
+          const res = await fetch(`http://localhost:8000/simulate/vs_baseline?team_id=${teamId}`, { method: 'POST' });
+          if (!res.ok) {
+            statusEl.textContent = 'Failed to queue match';
+            alert('Failed: ' + (await res.text()));
+            return;
+          }
+          const data = await res.json();
+          statusEl.textContent = `Match ${data.match_id} queued.`;
+          window.open(`viewer.html?id=${data.match_id}`, '_blank');
+        } catch (e) {
+          statusEl.textContent = 'Failed to queue match';
+          console.error(e);
+        }
+      };
+    })();
+  </script>
+</body>
+</html> 

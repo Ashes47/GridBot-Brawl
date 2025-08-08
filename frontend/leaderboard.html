@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Leaderboard – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px auto; max-width: 800px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background: #f5f5f5; }
+    .rank1 td { background:#fff9c4; } /* light yellow */
+    .rank2 td { background:#e0e7ff; }
+    .rank3 td { background:#fde68a; }
+    .tab{padding:6px 12px;border:1px solid #cbd5e1;border-bottom:none;cursor:pointer;border-radius:4px 4px 0 0;background:#e2e8f0;margin-right:4px;}
+    .tab.active{background:#fff;font-weight:bold;}
+    #modes { margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Leaderboard</h1>
+  <div id="modes">
+    <a href="leaderboard.html?mode=duo">Duo</a> |
+    <a href="leaderboard.html?mode=quad">Quad</a>
+  </div>
+  <div id="status" style="margin-bottom:12px;"></div>
+  <div style="margin-bottom: 12px; text-align: right;">
+    <button id="re-eval-btn">Admin Re-evaluate</button>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>W/L/D</th><th>Pts</th><th>HP Sum</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    let mode = params.get('mode') || 'duo';
+    function setActive(){
+      document.getElementById('tab-duo').classList.toggle('active',mode==='duo');
+      document.getElementById('tab-quad').classList.toggle('active',mode==='quad');
+      document.getElementById('title').textContent = mode==='duo'?'Duo Leaderboard':'Quad Leaderboard';
+    }
+
+    async function load() {
+      const mode = (new URLSearchParams(window.location.search)).get('mode') || 'duo';
+      const res = await fetch(`http://localhost:8000/leaderboard/${mode}`);
+      const data = await res.json();
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML='';
+      data.teams.forEach((t, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${idx+1}</td><td><a href="team.html?id=${t.team_id}" target="_blank">${t.name}</a></td><td>${t.wins}/${t.losses}/${t.draws}</td><td>${t.points}</td><td>${t.hp_total}</td>`;
+        tbody.appendChild(tr);
+      });
+      // update status
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = `${data.pending_matches} pending | ${data.running_matches} running`;
+    }
+    document.getElementById('re-eval-btn').onclick = async () => {
+      const adminPass = prompt('Enter admin password to re-evaluate all matches');
+      if (!adminPass) return;
+      
+      const form = new FormData();
+      form.append('admin_password', adminPass);
+
+      const res = await fetch('http://localhost:8000/leaderboard/re-evaluate', { method: 'POST', body: form });
+      if (res.ok) {
+        alert('Re-evaluation started. Refresh to see progress.');
+        load();
+      } else {
+        alert('Failed: ' + (await res.text()));
+      }
+    };
+    load();
+  </script>
+</body>
+</html> 

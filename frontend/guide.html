@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GridBot Brawl – Game Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; margin: 30px; max-width: 800px; }
+    h1, h2 { color: #2c3e50; }
+    code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
+    th { background: #f0f0f0; }
+    .emoji { font-size: 24px; }
+    #sample-buttons button { margin-right: 10px; }
+    /* modal */
+    #modal{position:fixed;top:0;left:0;width:100%;height:100%;display:none;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;}
+    #modal-box{background:#fff;max-width:90%;max-height:90%;overflow:auto;padding:20px;border-radius:8px;}
+    #tab-btns button{margin-right:6px;}
+  </style>
+</head>
+<body>
+  <h1>GridBot Brawl – Game Guide</h1>
+
+  <h2>Overview</h2>
+  <p>GridBot Brawl is a turn-based coding arena. Teams submit Python code that
+     controls <strong>five bots</strong>, each with a unique role and special power. Matches
+     run on a 10×10 grid (duo) or 15×15 grid (quad) and last up to 50 turns.</p>
+
+  <h2>How to Play</h2>
+  <ol>
+    <li>Write a single <code>.py</code> file that defines <em>exactly</em> five classes
+        named <code>Sniper</code>, <code>Tank</code>, <code>Bomber</code>, <code>Scout</code>, and
+        <code>Teleporter</code>. Each class must implement a <code>decide(self, obs)</code>
+        method that returns an action dictionary.</li>
+    <li>Go to <a href="signup.html">Team Signup</a>, enter team info, and upload your file.</li>
+    <li>Wait for the orchestrator to schedule a match, or trigger one via the API.</li>
+    <li>Watch replays in the <a href="viewer.html">Match Viewer</a> and track your
+        ranking on the <a href="leaderboard.html?mode=duo">Leaderboards</a>.</li>
+  </ol>
+
+  <h2>Action Dictionary</h2>
+  <table>
+    <tr><th>Action</th><th>Example</th></tr>
+    <tr><td>Move</td><td><code>{"type": "move", "direction": "north"}</code></td></tr>
+    <tr><td>Attack</td><td><code>{"type": "attack", "direction": "west"}</code></td></tr>
+    <tr><td>Dash (Scout)</td><td><code>{"type": "dash", "direction": "east"}</code></td></tr>
+    <tr><td>Shield (Tank)</td><td><code>{"type": "shield"}</code></td></tr>
+    <tr><td>Snipe (Sniper)</td><td><code>{"type": "snipe", "target": {"x":3,"y":5}}</code></td></tr>
+    <tr><td>Explode (Bomber)</td><td><code>{"type": "explode"}</code></td></tr>
+    <tr><td>Blink (Teleporter)</td><td><code>{"type": "blink"}</code></td></tr>
+  </table>
+
+  <h2>Bot Roles &amp; Powers</h2>
+  <table>
+    <tr><th class="emoji">Icon</th><th>Role</th><th>Power (Cooldown)</th></tr>
+    <tr><td class="emoji">🎯</td><td>Sniper</td><td>Snipe up to 5 tiles in straight line for 40 HP (3 turns)</td></tr>
+    <tr><td class="emoji">🛡️</td><td>Tank</td><td>Shield – 50 % damage reduction for 3 turns (5 turns)</td></tr>
+    <tr><td class="emoji">💣</td><td>Bomber</td><td>Explode 3×3 AoE for 30 HP (self 10 HP) (4 turns)</td></tr>
+    <tr><td class="emoji">🏃</td><td>Scout</td><td>Dash 2 tiles orthogonally (2 turns)</td></tr>
+    <tr><td class="emoji">✨</td><td>Teleporter</td><td>Blink to random empty tile (5 turns)</td></tr>
+  </table>
+
+  <h2>Rules</h2>
+  <ul>
+    <li>All bots start with 100 HP.</li>
+    <li>Orthogonal movement only (N/E/S/W).</li>
+    <li>Bots see everything within 4-tile radius; visibility is shared team-wide.</li>
+    <li>Match ends when one team is eliminated or after 50 turns.<br>
+        – Tie-breakers: total team HP → surviving bots → draw.</li>
+    <li>Base attack deals 20 HP to an adjacent enemy tile.</li>
+    <li>No friendly fire except Bomber’s AoE (can hit allies).</li>
+    <li>Your <code>decide</code> method must finish within 100 ms and stay under 256 MB.</li>
+  </ul>
+
+  <h2>Example Strategy Snippets</h2>
+  <p>Below are minimal ideas you can adapt:</p>
+  <ul>
+    <li><strong>Tank “Pusher”</strong> – move toward nearest enemy; shield when HP &lt; 70.</li>
+    <li><strong>Scout “Explorer”</strong> – dash east until wall, then south one tile, repeat (lawn-mower reveal).</li>
+    <li><strong>Bomber “Kamikaze”</strong> – explode immediately if 2+ enemies adjacent, otherwise chase lowest-HP enemy.</li>
+  </ul>
+  <p>You can browse existing teams on the <a href="teams.html">Teams Directory</a> to get inspiration—bot code itself is private, but match replays show behaviour.</p>
+
+  <h2>Observation Object (per turn)</h2>
+  <p>Your <code>decide</code> method receives a single argument <code>obs</code> – a
+     plain Python dict with the following shape:</p>
+  <pre><code>{
+  "turn": 13,
+  "map_size": [10, 10],
+  "self": {
+    "id": "alpha_3",
+    "x": 4,
+    "y": 3,
+    "health": 60,
+    "component": "sniper",
+    "cooldowns": { "power": 0 }
+  },
+  "visible_enemies": [
+    { "id": "beta_1", "x": 7, "y": 3, "team": "Beta", "component": "tank" },
+    { "id": "beta_4", "x": 4, "y": 6, "team": "Beta", "component": "scout" }
+  ],
+  "visible_allies": [
+    { "id": "alpha_1", "x": 3, "y": 3, "team": "Alpha", "component": "tank" },
+    { "id": "alpha_2", "x": 5, "y": 3, "team": "Alpha", "component": "scout" }
+  ]
+}</code></pre>
+  <ul>
+    <li><code>turn</code>: current turn number (0-based).</li>
+    <li><code>map_size</code>: <code>[width, height]</code> – 10×10 or 15×15.</li>
+    <li><code>self</code>: your bot’s current state including remaining power cooldown.</li>
+    <li><code>visible_enemies</code> / <code>visible_allies</code>: bots within 4-tile radius (Chebyshev distance).</li>
+  </ul>
+
+  <h2>Writing Your Bot Classes</h2>
+  <p>Create a file that <strong>defines exactly five classes</strong> – one per role. Each
+     class must implement a <code>decide(self, obs)</code> method and may keep
+     persistent state via instance attributes:</p>
+
+  <pre><code>import random
+from typing import Dict, Any
+
+class Sniper:
+    def __init__(self):
+        # persisted across turns
+        self.state: Dict[str, Any] = {"strafe": "east"}
+
+    def decide(self, obs):
+        # 1. Use observation to pick an action
+        enemies = obs["visible_enemies"]
+        me = obs["self"]
+
+        # Snipe straight-line enemy ≤5 tiles
+        for e in enemies:
+            if e["x"] == me["x"] and abs(e["y"] - me["y"]) &lt;= 5:
+                return {"type": "snipe", "target": {"x": me["x"], "y": e["y"]}}
+            if e["y"] == me["y"] and abs(e["x"] - me["x"]) &lt;= 5:
+                return {"type": "snipe", "target": {"x": e["x"], "y": me["y"]}}
+
+        # 2. If no target: advance toward center of the map
+        mid_x = obs["map_size"][0] // 2
+        dir_ = "east" if me["x"] < mid_x else "west"
+        return {"type": "move", "direction": dir_}
+</code></pre>
+  <p>Repeat for <code>Tank</code>, <code>Bomber</code>, <code>Scout</code>, <code>Teleporter</code>.</p>
+
+  <h3>Quick Tips</h3>
+  <ul>
+    <li>Store custom data in <code>self.state</code> (dict) to remember decisions.</li>
+    <li>Keep <code>decide</code> under 100&nbsp;ms – avoid heavy computation.</li>
+    <li>Validate your output against the <a href="#action-dictionary">Action Dictionary</a>.</li>
+    <li>The engine ignores unknown keys – be strict to avoid "idle" fallback.</li>
+  </ul>
+
+  <h2>Sample Bot Files</h2>
+  <div id="sample-buttons"></div>
+
+  <div id="modal">
+    <div id="modal-box">
+      <div style="text-align:right"><button id="close">Close ✖</button></div>
+      <h3 id="modal-title" style="margin-top:0"></h3>
+      <pre id="code" style="background:#f4f4f4;padding:10px;overflow:auto"></pre>
+    </div>
+  </div>
+
+  <script>
+    const sampleNames = [
+      {name: "Sniper-Turtle", file: "team_sniper_turtle.py"},
+      {name: "ZergRush", file: "team_zerg_rush.py"},
+      {name: "AreaControl", file: "team_area_control.py"},
+      {name: "SnakeSwarm", file: "team_snake_swarm.py"}
+    ];
+    const samples = {};
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const codeEl = document.getElementById('code');
+    const buttonsDiv = document.getElementById('sample-buttons');
+
+    Promise.all(sampleNames.map(({name, file}) =>
+      fetch(`sample_bots/${file}`)
+        .then(r => r.text())
+        .then(code => ({ name, code }))
+    )).then(loadedSamples => {
+      loadedSamples.forEach(({ name, code }) => {
+        samples[name] = code;
+        const btn = document.createElement('button');
+        btn.textContent = `📄 ${name}`;
+        btn.onclick = () => {
+          modalTitle.textContent = name;
+          codeEl.textContent = samples[name];
+          modal.style.display = 'flex';
+        };
+        buttonsDiv.appendChild(btn);
+      });
+    });
+
+    document.getElementById('close').onclick = () => {
+      modal.style.display = 'none';
+    };
+  </script>
+
+  <h2 id="scoring">Scoring &amp; Leaderboard</h2>
+  <ul>
+    <li>Win = <strong>3</strong> points</li>
+    <li>Draw = <strong>1</strong> point</li>
+    <li>Loss = 0 points</li>
+    <li>Tie-breaker 1: higher total HP remaining across all finished matches.</li>
+    <li>Tie-breaker 2 (future): total damage dealt.</li>
+  </ul>
+
+  <p><a href="index.html">← Back to home</a></p>
+</body>
+</html> 
