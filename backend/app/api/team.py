@@ -47,23 +47,33 @@ async def create_team(
     name: str = Form(..., max_length=100),
     members: str = Form(..., description="Comma-separated member names"),
     password: str = Form(..., min_length=6),
-    bot_file: UploadFile = File(...),
+    bot_file: UploadFile | None = File(None),
     session: AsyncSession = Depends(get_session),
 ):
-    """Register a team and upload its bot code."""
+    """Register a team and optionally upload its bot code. If no code provided, a placeholder is created."""
     # ensure unique name
     existing = await session.execute(select(Team).where(Team.name == name))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Team name already taken")
 
-    # Read file content
-    code_bytes = await bot_file.read()
-    try:
-        code_str = code_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="File must be UTF-8 text")
-
-    _validate_bot_file(code_str)
+    code_str: str
+    if bot_file is not None:
+        # Read file content
+        code_bytes = await bot_file.read()
+        try:
+            code_str = code_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="File must be UTF-8 text")
+        _validate_bot_file(code_str)
+    else:
+        # Minimal safe placeholder bot implementing required classes
+        code_str = (
+            "class Sniper:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
+            "class Tank:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
+            "class Bomber:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
+            "class Scout:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
+            "class Teleporter:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
+        )
 
     # Persist file on disk
     team_id = uuid.uuid4()

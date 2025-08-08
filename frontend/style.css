@@ -27,6 +27,16 @@ button {
 }
 button:hover { background: #1e293b; }
 
+/* site header */
+.site-header { background: #0f172a; color: #fff; }
+.site-header .nav { max-width: 1100px; margin: 0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 16px; }
+.site-header a { color:#fff; text-decoration:none; margin-right:12px; }
+.site-header a:hover { text-decoration: underline; }
+.site-header .brand { font-weight: 700; letter-spacing: .3px; }
+.site-header .links a { opacity: .9; }
+.site-header .links a:last-child { margin-right: 0; }
+.site-header .links a:hover { opacity: 1; }
+
 /* badges */
 .badge { padding:2px 6px; border-radius:4px; font-size:12px; color:#fff; }
 .win { background:#22c55e; }

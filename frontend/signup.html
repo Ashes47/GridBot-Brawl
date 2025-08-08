@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Signup – GridBot Brawl</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
     label { display: block; margin-top: 12px; }
@@ -12,6 +13,17 @@
   </style>
 </head>
 <body>
+  <header class="site-header">
+    <div class="nav">
+      <a class="brand" href="index.html">🤖 GridBot Brawl</a>
+      <nav class="links">
+        <a href="leaderboard.html?mode=duo">Leaderboards</a>
+        <a href="teams.html">Teams</a>
+        <a href="signup.html">Signup</a>
+        <a href="guide.html">Guide</a>
+      </nav>
+    </div>
+  </header>
   <h1>Team Signup</h1>
   <form id="signup-form" action="http://localhost:8000/teams" method="post" enctype="multipart/form-data">
     <label>Team Name
@@ -26,9 +38,7 @@
       <input type="password" name="password" minlength="6" required>
     </label>
 
-    <label>Bot File (.py with 5 bot classes)
-      <input type="file" name="bot_file" accept=".py" required>
-    </label>
+    <!-- Code upload has moved to the Team page -->
 
     <button type="submit">Register Team</button>
   </form>

@@ -18,11 +18,35 @@
   </style>
 </head>
 <body>
+  <header class="site-header">
+    <div class="nav">
+      <a class="brand" href="index.html">�� GridBot Brawl</a>
+      <nav class="links">
+        <a href="leaderboard.html?mode=duo">Leaderboards</a>
+        <a href="teams.html">Teams</a>
+        <a href="signup.html">Signup</a>
+        <a href="guide.html">Guide</a>
+      </nav>
+    </div>
+  </header>
   <h1 id="team-name">Team</h1>
   <div id="components"></div>
   <div style="margin:10px 0;">
     <button id="test-baseline">▶ Test vs Baseline</button>
     <span id="test-status" style="margin-left:8px;color:#555;"></span>
+  </div>
+
+  <h3>Code Management</h3>
+  <form id="upload-form" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    <input type="file" name="bot_file" accept=".py" required>
+    <input type="password" name="password" placeholder="Team password" minlength="6" required>
+    <button type="submit">Upload New Code</button>
+    <span id="upload-status" style="color:#555;"></span>
+  </form>
+
+  <div style="margin-top:10px;">
+    <button id="submit-eval">Submit for evaluation</button>
+    <span id="eval-status" style="margin-left:8px;color:#555;"></span>
   </div>
 
   <h3>Duo Matches</h3>
@@ -142,6 +166,38 @@
         } catch (e) {
           statusEl.textContent = 'Failed to queue match';
           console.error(e);
+        }
+      };
+
+      // Upload new code (password required)
+      const uploadForm = document.getElementById('upload-form');
+      uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const statusEl = document.getElementById('upload-status');
+        statusEl.textContent = 'Uploading…';
+        const formData = new FormData(uploadForm);
+        try {
+          const res = await fetch(`http://localhost:8000/teams/${teamId}`, { method: 'PUT', body: formData });
+          const txt = await res.text();
+          if (!res.ok) throw new Error(txt);
+          statusEl.textContent = 'Updated';
+        } catch (err) {
+          statusEl.textContent = 'Failed';
+          alert('Upload failed: ' + err.message);
+        }
+      });
+
+      // Submit for evaluation: queue vs baseline as a quick check
+      document.getElementById('submit-eval').onclick = async () => {
+        const el = document.getElementById('eval-status');
+        el.textContent = 'Submitting…';
+        try {
+          const res = await fetch(`http://localhost:8000/simulate/vs_baseline?team_id=${teamId}`, { method: 'POST' });
+          if (!res.ok) { el.textContent = 'Failed'; alert('Failed: ' + (await res.text())); return; }
+          const data = await res.json();
+          el.textContent = `Queued match ${data.match_id}`;
+        } catch (e) {
+          el.textContent = 'Failed';
         }
       };
     })();
