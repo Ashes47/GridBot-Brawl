@@ -72,9 +72,12 @@ class _SandboxManager:
             tid: load_team(tid, path, team_bots_map[tid])
             for tid, path in team_files.items()
         }
+        # last_observations maps bot_id -> obs for the most recent decide cycle
+        self.last_observations: Dict[str, dict] = {}
 
     def decide_actions(self, state: GameState) -> Dict[str, object]:
         actions: Dict[str, object] = {}
+        obs_map: Dict[str, dict] = {}
         for bot in state.all_bots():
             ctrl = self.controllers.get(bot.team_id)
             if not ctrl:
@@ -114,6 +117,7 @@ class _SandboxManager:
                 "visible_enemies": vis_enemies,
                 "visible_allies": vis_allies,
             }
+            obs_map[bot.id] = obs
             action_dict = safe_decide(proxy, obs)
             # translate to Action instances
             from app.engine.models import (
@@ -142,6 +146,7 @@ class _SandboxManager:
             elif t == "blink":
                 actions[bot.id] = BlinkAction()
             # else: unknown or malformed -> idle
+        self.last_observations = obs_map
         return actions
 
 
@@ -191,6 +196,7 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
     winner_team_id: str | None = None
     sandbox = _SandboxManager({tid: path for tid, path in team_files.items()}, team_bots_map)
     damage_done_total: Dict[str, int] = {tid: 0 for tid in team_ids}
+    damage_by_bot_total: Dict[str, int] = {}
 
     while turn < TURN_LIMIT and not winner_team_id:
         actions = sandbox.decide_actions(state)
@@ -219,6 +225,8 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
         for tid, amount in getattr(engine, 'damage_done_by_team', {}).items():
             if tid in damage_done_total:
                 damage_done_total[tid] += amount
+        for bid, amount in getattr(engine, 'damage_done_by_bot', {}).items():
+            damage_by_bot_total[bid] = damage_by_bot_total.get(bid, 0) + amount
 
         # derive simple events
         events: list[str] = []
@@ -288,6 +296,7 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
                 "actions": actions_serial,
                 "positions": {b.id: [b.position.x, b.position.y] for b in state.all_bots()},
                 "hp": {b.id: b.hp for b in state.all_bots()},
+                "observations": sandbox.last_observations,
                 "cooldowns": cooldowns,
                 "shields": shields,
                 "events": events,
@@ -321,7 +330,13 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
     match_dir.mkdir(parents=True, exist_ok=True)
     log_filename = f"{uuid.uuid4()}.json"
     log_path = match_dir / log_filename
-    log_path.write_text(json.dumps(log), encoding="utf-8")
+    # append simple summary frame for viewer end panel
+    summary = {
+        "summary": True,
+        "damage_by_bot": damage_by_bot_total,
+    }
+    log_with_tail = log + [summary]
+    log_path.write_text(json.dumps(log_with_tail), encoding="utf-8")
 
     return {
         "winner_team_id": winner_team_id,
@@ -329,6 +344,7 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
         "log_path": str(log_path),
         "team_hp": final_hp,
         "team_damage": damage_done_total,
+        "damage_by_bot": damage_by_bot_total,
     }
 
 

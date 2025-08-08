@@ -40,6 +40,8 @@ class TurnEngine:
         self.occupancy = self.state.occupied_positions()  # (x,y) -> Bot
         # Track damage dealt this turn per team_id
         self.damage_done_by_team: Dict[str, int] = {}
+        # Track damage dealt this turn per bot_id
+        self.damage_done_by_bot: Dict[str, int] = {}
 
     # -------------------------------------------------------
     # Main entry
@@ -146,6 +148,11 @@ class TurnEngine:
             return
         self.damage_done_by_team[team_id] = self.damage_done_by_team.get(team_id, 0) + amount
 
+    def _inc_bot_damage(self, bot_id: str, amount: int):
+        if amount <= 0:
+            return
+        self.damage_done_by_bot[bot_id] = self.damage_done_by_bot.get(bot_id, 0) + amount
+
     def _phase_attack(self):
         damage_queue: Dict[str, int] = {}
 
@@ -158,6 +165,7 @@ class TurnEngine:
                 if tgt and tgt.team_id != bot.team_id:
                     damage_queue[tgt.id] = damage_queue.get(tgt.id, 0) + BASE_ATTACK_DMG
                     self._inc_team_damage(bot.team_id, BASE_ATTACK_DMG)
+                    self._inc_bot_damage(bot.id, BASE_ATTACK_DMG)
 
         # snipe events
         for sniper, target in self.effects.snipe_events:
@@ -173,6 +181,7 @@ class TurnEngine:
             if tgt_bot and tgt_bot.team_id != sniper.team_id:
                 damage_queue[tgt_bot.id] = damage_queue.get(tgt_bot.id, 0) + SNIPER_DMG
                 self._inc_team_damage(sniper.team_id, SNIPER_DMG)
+                self._inc_bot_damage(sniper.id, SNIPER_DMG)
 
         # explode AoE
         for bomber in self.effects.explode_bots:
@@ -192,6 +201,7 @@ class TurnEngine:
                         damage_queue[tgt.id] = damage_queue.get(tgt.id, 0) + BOMBER_AOE_DMG
                         if tgt.team_id != bomber.team_id:
                             self._inc_team_damage(bomber.team_id, BOMBER_AOE_DMG)
+                            self._inc_bot_damage(bomber.id, BOMBER_AOE_DMG)
         # apply damages
         for bot in self.state.all_bots():
             dmg = damage_queue.get(bot.id, 0)

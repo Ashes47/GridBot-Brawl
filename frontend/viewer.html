@@ -10,6 +10,18 @@
     #controls { margin-top: 10px; }
     #legend { margin-top: 15px; font-size: 20px; }
     #layout { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:10px; }
+    #left-panel { width: 240px; max-height: 620px; overflow:auto; text-align:left; border:1px solid #ddd; padding:8px; border-radius:6px; background:#ffffffee; backdrop-filter: blur(2px); }
+    .tabs{ display:flex; gap:6px; margin-bottom:8px; }
+    .tab-btn{ flex:1; padding:6px 8px; font-size:12px; border:1px solid #e5e7eb; background:#f8fafc; border-radius:6px; cursor:pointer; }
+    .tab-btn.active{ background:#e0f2fe; border-color:#bae6fd; }
+    #bot-stats .row{ position:relative; display:grid; grid-template-columns: 1fr auto; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; margin-bottom:4px; background:#f8fafc; }
+    #bot-stats .row .bar{ position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg, #e2e8f0, #f8fafc); border-radius:6px; z-index:0; }
+    #bot-stats .name{ position:relative; z-index:1; max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; color:#0f172a; display:flex; align-items:center; gap:6px; }
+    #bot-stats .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; }
+    #bot-stats .val{ position:relative; z-index:1; font-variant-numeric: tabular-nums; font-size:12px; color:#0f172a; }
+    #bot-stats .badge{ display:inline-block; margin-left:6px; padding:1px 6px; font-size:11px; border-radius:999px; background:#e2e8f0; color:#0f172a; }
+    #inspect { margin-top:0; font-size: 12px; }
+    #inspect pre{ max-height:240px; overflow:auto; background:#0b1020; color:#e2e8f0; border:1px solid #1f2937; padding:8px; border-radius:6px; }
     #right-panel { width: 320px; max-height: 620px; overflow:auto; text-align:left; border:1px solid #ddd; padding:8px; border-radius:6px; }
     #log { font-family: monospace; font-size: 13px; }
     .log-turn { margin:6px 0; cursor: pointer; }
@@ -18,11 +30,39 @@
     .highlight { box-shadow: 0 0 0 3px rgba(59,130,246,0.6) inset; }
     #bot-info { font-size: 14px; margin-bottom:8px; }
     #extra-controls button { margin: 0 4px; }
+    #toggles { margin-top:6px; font-size: 14px; }
+    #end-panel { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); }
+    #end-card { background:#fff; padding:18px 22px; border-radius:10px; min-width:320px; text-align:left; }
+    #toast { position:fixed; top:16px; right:16px; background:rgba(0,0,0,0.75); color:#fff; padding:8px 12px; border-radius:6px; display:none; }
+    #start-banner{ position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 16px; border-radius:8px; opacity:0; transition:opacity .4s ease; }
+    #tooltip{ position:fixed; pointer-events:none; background:rgba(0,0,0,0.75); color:#fff; padding:4px 6px; border-radius:4px; font-size:12px; display:none; }
   </style>
 </head>
 <body>
   <h1>Match Viewer</h1>
   <div id="layout">
+    <div id="left-panel">
+      <div style="font-weight:bold; margin-bottom:6px;">Bot Stats</div>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="stats">Stats</button>
+        <button class="tab-btn" data-tab="inspect">Inspect</button>
+      </div>
+      <div id="tab-stats">
+        <div id="bot-stats"></div>
+        <label style="display:block; margin-top:8px;"><input type="checkbox" id="pinSelected"> Pin selected bot on top</label>
+      </div>
+      <div id="tab-inspect" style="display:none;">
+        <div id="inspect">
+          <div style="font-weight:bold; margin:6px 0;">Inspect Observation</div>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span>Bot:</span>
+            <select id="inspect-bot"></select>
+            <span style="color:#64748b;">Follows current turn</span>
+          </div>
+          <pre id="inspect-output"></pre>
+        </div>
+      </div>
+    </div>
     <div>
       <canvas id="grid" width="600" height="600"></canvas>
       <div id="info"></div>
@@ -39,9 +79,16 @@
         <button id="back5">⏮ -5</button>
         <button id="fwd1">+1 ▶︎</button>
         <button id="fwd5">+5 ⏭</button>
+        <button id="prevEvent">Prev Event</button>
         <button id="nextEvent">Next Event</button>
         <button id="reverse">Reverse ⤿</button>
         <button id="snapshot">Copy Snapshot Link</button>
+        <label style="margin-left:8px;">Team View: 
+          <select id="team-view">
+            <option value="">Global</option>
+          </select>
+        </label>
+        <label style="margin-left:8px;"><input type="checkbox" id="sfxToggle"> SFX</label>
       </div>
       <div id="legend"></div>
     </div>
@@ -50,6 +97,14 @@
       <div id="log"></div>
     </div>
   </div>
+  <div id="end-panel"><div id="end-card">
+    <h3 id="end-title" style="margin-top:0;">Match Finished</h3>
+    <div id="end-body"></div>
+    <div style="text-align:right; margin-top:10px;"><button id="close-end">Close</button></div>
+  </div></div>
+  <div id="toast"></div>
+  <div id="start-banner"></div>
+  <div id="tooltip"></div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -76,6 +131,145 @@
     let reverseMode = false;
     let selectedBotId = null;
     let teamsMeta = [];
+    let selectedTeamPrefix = ""; // empty = global
+    let cinematic = true;
+    let metaInfo = null;
+    // tween/animation state
+    let animStart = 0; // performance.now()
+    let tickMs = 600; // default; adjusted by speed buttons
+    let rafId = null;
+    let damageTexts = []; // {x,y,text,ttl}
+    let particles = []; // {x,y,vx,vy,life}
+    let playEventsOnly = false;
+    let visibleCells = null; // for fog-of-war
+    let summaryDamageByBot = {};
+    function computeLiveDamage(uptoTick){
+      const dmg = {};
+      const len = Math.min(uptoTick, frames.length-1);
+      for (let t=0; t<len; t++){
+        const prev = frames[t]; const curr = frames[t+1];
+        if (!prev || !curr || !prev.positions || !curr.positions) continue;
+        const posToBid = {};
+        Object.entries(prev.positions).forEach(([bid,[x,y]])=>{ posToBid[`${x},${y}`]=bid; });
+        const actions = prev.actions || {};
+        for (const [bid, act] of Object.entries(actions)){
+          if (!act || !prev.positions[bid]) continue;
+          const me = prev.positions[bid];
+          const add = (victimBid)=>{
+            if (!victimBid) return;
+            const before = prev.hp?.[victimBid];
+            const after = curr.hp?.[victimBid];
+            if (typeof before==='number' && typeof after==='number' && after < before){
+              const delta = before - after;
+              dmg[bid] = (dmg[bid]||0) + delta;
+            }
+          };
+          if (act.type==='attack' && act.direction){
+            const dirDelta={north:[0,-1],south:[0,1],east:[1,0],west:[-1,0]}[act.direction];
+            if (dirDelta){
+              const tx = me[0]+dirDelta[0], ty=me[1]+dirDelta[1];
+              add(posToBid[`${tx},${ty}`]);
+            }
+          } else if (act.type==='snipe' && Array.isArray(act.target)){
+            const [tx,ty]=act.target; add(posToBid[`${tx},${ty}`]);
+          } else if (act.type==='explode'){
+            for (let dx=-1; dx<=1; dx++){
+              for (let dy=-1; dy<=1; dy++){
+                if (dx===0 && dy===0) continue;
+                const tx=me[0]+dx, ty=me[1]+dy; add(posToBid[`${tx},${ty}`]);
+              }
+            }
+          }
+        }
+      }
+      return dmg;
+    }
+    // SFX
+    let sfxEnabled = false;
+    let audioCtx = null;
+    let noiseBuf = null;
+    const sfxCooldownMs = {attack:120, snipe:220, explode:380, shield:180};
+    const sfxLastAt = {attack:0, snipe:0, explode:0, shield:0};
+    function initAudio(){ if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); makeNoiseBuffer(); } }
+    function makeNoiseBuffer(){
+      const sr = audioCtx.sampleRate; const len = sr * 0.3; const buf = audioCtx.createBuffer(1,len,sr); const data = buf.getChannelData(0);
+      for(let i=0;i<len;i++){ data[i] = (Math.random()*2-1) * Math.exp(-i/(sr*0.08)); }
+      noiseBuf = buf;
+    }
+    function sfx(type){
+      if(!sfxEnabled) return;
+      initAudio();
+      const now = audioCtx.currentTime*1000;
+      // allow only one sfx per tick overall
+      if (now - (sfxLastAt.__any||0) < 140) return;
+      if (now - sfxLastAt[type] < (sfxCooldownMs[type]||150)) return;
+      sfxLastAt[type] = now; sfxLastAt.__any = now;
+      try{
+        if(type==='explode' && noiseBuf){
+          const src = audioCtx.createBufferSource(); src.buffer = noiseBuf;
+          const lp = audioCtx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=800;
+          const g = audioCtx.createGain(); g.gain.value = 0.06;
+          src.connect(lp); lp.connect(g); g.connect(audioCtx.destination);
+          src.start(); src.stop(audioCtx.currentTime+0.18);
+        } else if(type==='snipe'){
+          const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+          o.type='square'; o.frequency.setValueAtTime(1100,audioCtx.currentTime);
+          o.frequency.exponentialRampToValueAtTime(700, audioCtx.currentTime+0.1);
+          g.gain.setValueAtTime(0.0008, audioCtx.currentTime);
+          g.gain.linearRampToValueAtTime(0.025,audioCtx.currentTime+0.01);
+          g.gain.exponentialRampToValueAtTime(0.0008,audioCtx.currentTime+0.12);
+          o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.13);
+        } else if(type==='attack'){
+          const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+          o.type='triangle'; o.frequency.value=240;
+          g.gain.setValueAtTime(0.0008,audioCtx.currentTime);
+          g.gain.linearRampToValueAtTime(0.02,audioCtx.currentTime+0.01);
+          g.gain.exponentialRampToValueAtTime(0.0008,audioCtx.currentTime+0.07);
+          o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.08);
+        } else if(type==='shield'){
+          const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+          o.type='sine'; o.frequency.value=500;
+          g.gain.setValueAtTime(0.0008,audioCtx.currentTime);
+          g.gain.linearRampToValueAtTime(0.018,audioCtx.currentTime+0.02);
+          g.gain.exponentialRampToValueAtTime(0.0008,audioCtx.currentTime+0.11);
+          o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+0.12);
+        }
+      }catch(e){}
+    }
+    let sfxTickStamp = -1; // prevent multiple per tick explosion sound
+
+    // live last-hit mapper for kill counters
+    function computeLiveDamageMap(uptoTick){
+      const dmg = {}; const lastHit = {};
+      const len = Math.min(uptoTick, frames.length-1);
+      for (let t=0; t<len; t++){
+        const prev = frames[t]; const curr = frames[t+1];
+        if (!prev || !curr || !prev.positions || !curr.positions) continue;
+        const posToBid = {}; Object.entries(prev.positions).forEach(([bid,[x,y]])=>{ posToBid[`${x},${y}`]=bid; });
+        const actions = prev.actions || {};
+        for (const [bid, act] of Object.entries(actions)){
+          if (!act || !prev.positions[bid]) continue;
+          const me = prev.positions[bid];
+          const add = (victimBid)=>{
+            if (!victimBid) return; const before = prev.hp?.[victimBid]; const after = curr.hp?.[victimBid];
+            if (typeof before==='number' && typeof after==='number' && after < before){
+              const delta = before - after; dmg[bid] = (dmg[bid]||0) + delta; lastHit[victimBid]=bid;
+              // per-bot spark reinforce (small white spark at victim)
+              const pxv=cellPixels(); particles.push({x:curr.positions[victimBid]?.[0]||me[0], y:curr.positions[victimBid]?.[1]||me[1], vx:0, vy:-0.03, life:220});
+            }
+          };
+          if (act.type==='attack' && act.direction){ const d={north:[0,-1],south:[0,1],east:[1,0],west:[-1,0]}[act.direction]; if(d){ add(posToBid[`${me[0]+d[0]},${me[1]+d[1]}`]); } }
+          else if (act.type==='snipe' && Array.isArray(act.target)){ const [tx,ty]=act.target; add(posToBid[`${tx},${ty}`]); }
+          else if (act.type==='explode'){ for (let dx=-1;dx<=1;dx++){ for(let dy=-1;dy<=1;dy++){ if(dx||dy){ add(posToBid[`${me[0]+dx},${me[1]+dy}`]); }}} }
+        }
+      }
+      // count kills when a victim reaches 0 and lastHit identifies attacker
+      const kills = {}; const lastFrame = frames[len] || frames[frames.length-1];
+      if (lastFrame && lastFrame.hp){
+        Object.entries(lastFrame.hp).forEach(([bid,hp])=>{ if (hp<=0 && lastHit[bid]){ const atk=lastHit[bid]; kills[atk]=(kills[atk]||0)+1; } });
+      }
+      return {dmg, kills};
+    }
 
     const ROLE_ICON = { sn: '🎯', ta: '🛡️', bo: '💣', sc: '🏃', te: '✨' };
     const ROLE_COLOR = { sn: '#e74c3c', ta: '#3498db', sc: '#2ecc71', bo: '#f59e0b', te: '#9b59b6' };
@@ -88,33 +282,74 @@
       const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role] || role;
       return `${teamName} ${roleName}`;
     }
+    function easeInOut(t){ return t<0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
+    function lerp(a,b,t){ return a + (b-a)*t; }
 
     // build legend
     const legendDiv = document.getElementById('legend');
     legendDiv.innerHTML = Object.entries({sn:'Sniper',ta:'Tank',bo:'Bomber',sc:'Scout',te:'Teleporter'})
       .map(([code,label])=>`<span style="margin-right:15px;">${ROLE_ICON[code]} – ${label}</span>`).join('');
 
-    document.getElementById('play').onclick = () => { playing = true; loop(); };
-    document.getElementById('pause').onclick = () => { playing = false; clearTimeout(timer); };
-    document.getElementById('speed1').onclick = ()=>{ interval=500; };
-    document.getElementById('speed2').onclick = ()=>{ interval=250; };
-    document.getElementById('speed4').onclick = ()=>{ interval=125; };
+    document.getElementById('play').onclick = () => { playing = true; animStart = performance.now(); if(!rafId) rafId=requestAnimationFrame(step); };
+    document.getElementById('pause').onclick = () => { playing = false; };
+    document.getElementById('speed1').onclick = ()=>{ interval=500; tickMs=600; };
+    document.getElementById('speed2').onclick = ()=>{ interval=250; tickMs=350; };
+    document.getElementById('speed4').onclick = ()=>{ interval=125; tickMs=200; };
     document.getElementById('back1').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.max(0,tick-1); render(); };
     document.getElementById('back5').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.max(0,tick-5); render(); };
     document.getElementById('fwd1').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.min(frames.length-1,tick+1); render(); };
     document.getElementById('fwd5').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.min(frames.length-1,tick+5); render(); };
+    document.getElementById('prevEvent').onclick = ()=>{
+      playing=false; clearTimeout(timer);
+      for (let i=tick-1;i>=0;i--){
+        const ev = frames[i].events||[];
+        if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { tick=i; render(); return; }
+      }
+    };
     document.getElementById('nextEvent').onclick = ()=>{
       playing=false; clearTimeout(timer);
       for (let i=tick+1;i<frames.length;i++){
         const ev = frames[i].events||[];
         if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { tick=i; render(); return; }
       }
+      // if none further, show end panel
+      showEndPanel();
     };
+    // Play events only
+    const btnPlayEvents = document.createElement('button');
+    btnPlayEvents.textContent = 'Play Events';
+    document.getElementById('extra-controls').appendChild(btnPlayEvents);
+    btnPlayEvents.onclick = ()=>{ playEventsOnly = true; playing=true; animStart=performance.now(); if(!rafId) rafId=requestAnimationFrame(step); };
     document.getElementById('reverse').onclick = ()=>{ reverseMode = !reverseMode; };
     document.getElementById('snapshot').onclick = ()=>{
       const url = `${location.origin}${location.pathname}?id=${encodeURIComponent(matchId)}&turn=${tick}`;
       navigator.clipboard.writeText(url).then(()=>{ alert('Snapshot link copied!'); });
     };
+    document.getElementById('sfxToggle').onchange = (e)=>{ sfxEnabled = e.target.checked; if (sfxEnabled) { initAudio(); sfx('shield'); } };
+    document.getElementById('pinSelected').onchange = (e)=>{ render(); };
+    // Tabs
+    document.querySelectorAll('.tab-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('tab-stats').style.display = tab==='stats' ? '' : 'none';
+        document.getElementById('tab-inspect').style.display = tab==='inspect' ? '' : 'none';
+      };
+    });
+    // Inspector auto-follows current turn
+    function updateInspector(){
+      const botSel = document.getElementById('inspect-bot');
+      const bid = (botSel && botSel.value) || selectedBotId;
+      const frame = frames[tick];
+      const obs = frame?.observations?.[bid];
+      const pre = document.getElementById('inspect-output');
+      if (pre) pre.textContent = obs ? JSON.stringify(obs, null, 2) : 'No observation available';
+    }
+    const botSelEl = document.getElementById('inspect-bot');
+    if (botSelEl){ botSelEl.onchange = updateInspector; }
+    // end panel close
+    document.getElementById('close-end').onclick = ()=>{ document.getElementById('end-panel').style.display='none'; };
 
     async function fetchLog(logPath) {
       const res = await fetch(logPath);
@@ -122,6 +357,7 @@
       // infer grid size if not set by metadata
       let maxCoord = 0;
       frames.forEach(f => {
+        if (!f || f.summary || !f.positions) return;
         Object.values(f.positions).forEach(([x, y]) => { maxCoord = Math.max(maxCoord, x, y); });
       });
       gridSize = maxCoord >= 10 ? 15 : 10;
@@ -145,6 +381,14 @@
 
     function drawBots(frame) {
       const px = cellPixels();
+      // camera shake if explode this tick
+      let shakeX=0, shakeY=0;
+      if (frame.events && frame.events.some(e=>e.startsWith('💣 '))){
+        const life = performance.now() - animStart;
+        if (life < 200){ shakeX = (Math.random()-0.5)*3; shakeY = (Math.random()-0.5)*3; }
+      }
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
       // choose deterministic color per team
       const teamColors = {};
       let colorIdx = 0;
@@ -156,6 +400,46 @@
           colorIdx++;
         }
       }
+      // compute visibility mask if team view selected
+      let visibleSet = null;
+      if (selectedTeamPrefix) {
+        visibleSet = new Set();
+        // collect ally positions
+        const allyPos = [];
+        for (const [bid, pos] of Object.entries(frame.positions)){
+          if (bid.startsWith(selectedTeamPrefix+"-")) allyPos.push(pos);
+        }
+        const cheb = (a,b)=> Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1]));
+        // all allies always visible
+        for (const [bid, pos] of Object.entries(frame.positions)){
+          if (bid.startsWith(selectedTeamPrefix+"-")) visibleSet.add(bid);
+        }
+        // enemies visible if within radius of any ally
+        for (const [bid, pos] of Object.entries(frame.positions)){
+          if (bid.startsWith(selectedTeamPrefix+"-")) continue;
+          for (const ap of allyPos){
+            if (cheb(pos, ap) <= 4){ visibleSet.add(bid); break; }
+          }
+        }
+        // compute visible cells for fog-of-war (Chebyshev radius 4 around allies)
+        visibleCells = new Set();
+        for (const ap of allyPos){
+          for (let dx=-4; dx<=4; dx++){
+            for (let dy=-4; dy<=4; dy++){
+              const x=ap[0]+dx, y=ap[1]+dy;
+              if (Math.max(Math.abs(dx),Math.abs(dy))<=4 && x>=0 && y>=0 && x<gridSize && y<gridSize){
+                visibleCells.add(`${x},${y}`);
+              }
+            }
+          }
+        }
+      }
+      // tween factor
+      const prev = frames[(tick-1+frames.length)%frames.length] || frame;
+      const now = performance.now();
+      const tnorm = Math.min(1, Math.max(0, (now - animStart)/tickMs));
+      const tt = cinematic ? easeInOut(tnorm) : 1;
+
       // trails for selected bot: last 3 positions
       if (selectedBotId) {
         const path = [];
@@ -177,7 +461,11 @@
         }
       }
       for (const [botId, pos] of Object.entries(frame.positions)) {
-        const [x, y] = pos;
+        if (visibleSet && !visibleSet.has(botId)) continue;
+        const [cx, cy] = pos;
+        const [pxPrev, pyPrev] = prev.positions[botId] || pos;
+        const x = cinematic ? lerp(pxPrev, cx, tt) : cx;
+        const y = cinematic ? lerp(pyPrev, cy, tt) : cy;
         const teamId = botId.split('-')[0];
         // base fill by team color
         ctx.fillStyle = teamColors[teamId];
@@ -187,7 +475,8 @@
         // shield glow
         const shieldTurns = frame.shields?.[botId] ?? 0;
         if (shieldTurns > 0) {
-          ctx.strokeStyle = 'rgba(59,130,246,0.9)';
+          const pulse = cinematic ? (0.6 + 0.4*Math.sin(now/150)) : 0.9;
+          ctx.strokeStyle = `rgba(59,130,246,${pulse})`;
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3 + 5, 0, Math.PI * 2);
@@ -201,8 +490,10 @@
           ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3 + 8, 0, Math.PI * 2);
           ctx.stroke();
         }
-        // health bar
-        const hp = frame.hp[botId];
+        // health bar (tweened)
+        const hpPrev = prev.hp?.[botId] ?? frame.hp[botId];
+        const hpCurr = frame.hp[botId];
+        const hp = cinematic ? Math.round(lerp(hpPrev, hpCurr, tt)) : hpCurr;
         const barW = px*0.6;
         const barH = 4;
         const barX = (x+0.5)*px - barW/2;
@@ -212,9 +503,9 @@
         ctx.fillStyle = '#22c55e';
         ctx.fillRect(barX, barY, barW*(hp/100), barH);
         // damage flash
-        const prev = lastHP[botId] ?? hp;
-        if(prev > hp){
-          ctx.fillStyle = 'rgba(239,68,68,0.6)';
+        const prevHPSeen = lastHP[botId] ?? hpCurr;
+        if(prevHPSeen > hpCurr){
+          ctx.fillStyle = 'rgba(239,68,68,0.35)';
           ctx.beginPath();
           ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3, 0, Math.PI * 2);
           ctx.fill();
@@ -229,29 +520,112 @@
       }
       lastHP = frame.hp;
 
-      // action visuals
+      // fog-of-war overlay
+      if (selectedTeamPrefix && visibleCells){
+        const pxSize = cellPixels();
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        for (let x=0;x<gridSize;x++){
+          for (let y=0;y<gridSize;y++){
+            if (!visibleCells.has(`${x},${y}`)){
+              ctx.fillRect(x*pxSize, y*pxSize, pxSize, pxSize);
+            }
+          }
+        }
+      }
+
+      // action visuals (only for visible actors when team view is on)
       if(frame.actions){
         Object.entries(frame.actions).forEach(([bid,act])=>{
+          if (visibleSet && !visibleSet.has(bid)) return;
           const pos = frame.positions[bid];
           if(!pos) return;
           const px=cellPixels();
           const sx=(pos[0]+0.5)*px, sy=(pos[1]+0.5)*px;
+          // action focus translucent icon
+          const lifeAct = performance.now() - animStart;
+          if (lifeAct < 180){
+            const roleCode = bid.split('-')[1];
+            const teamIdAct = bid.split('-')[0];
+            // soft team-colored backdrop
+            ctx.save();
+            ctx.globalAlpha = 0.22;
+            ctx.fillStyle = teamColors[teamIdAct] || '#ffffff';
+            ctx.beginPath(); ctx.arc(sx, sy, px/2, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+            ctx.save();
+            ctx.globalAlpha = 0.35;
+            ctx.font = `${px}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = ROLE_COLOR[roleCode] || '#000';
+            ctx.fillText(ROLE_ICON[roleCode] || '?', sx, sy);
+            ctx.restore();
+          }
           if(act.type==='attack'){
             const dirDelta={north:[0,-1],south:[0,1],east:[1,0],west:[-1,0]}[act.direction];
             const tx=sx+dirDelta[0]*px, ty=sy+dirDelta[1]*px;
             ctx.strokeStyle='red'; ctx.lineWidth=2;
             ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();
+            // spawn small spark at tip
+            if (lifeAct < 50){ particles.push({x:(tx/px)-0.5, y:(ty/px)-0.5, vx:0, vy:-0.02, life:250}); }
+            if (sfxEnabled && sfxTickStamp!==tick) sfx('attack');
           }else if(act.type==='snipe'){
-            const [tx,ty]=[act.target[0]*px+px/2, act.target[1]*px+px/2];
-            ctx.strokeStyle='orange';ctx.setLineDash([4,4]);ctx.lineWidth=2;
-            ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();ctx.setLineDash([]);
+            // beam only for first 150ms
+            const life = performance.now() - animStart;
+            if (!cinematic || life < 150){
+              const [tx,ty]=[act.target[0]*px+px/2, act.target[1]*px+px/2];
+              const grad = ctx.createLinearGradient(sx,sy,tx,ty);
+              grad.addColorStop(0,'rgba(255,165,0,0.0)');
+              grad.addColorStop(0.2,'rgba(255,165,0,0.8)');
+              grad.addColorStop(1,'rgba(255,165,0,0.0)');
+              ctx.strokeStyle=grad; ctx.lineWidth=3;
+              ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(tx,ty);ctx.stroke();
+              // impact particles
+              for (let i=0;i<6;i++) particles.push({x:act.target[0], y:act.target[1], vx:(Math.random()-0.5)*0.06, vy:(Math.random()-0.5)*0.06, life:300});
+              if (sfxEnabled && sfxTickStamp!==tick) sfx('snipe');
+            }
           }else if(act.type==='explode'){
-            ctx.fillStyle='rgba(255,115,0,0.3)';
-            ctx.beginPath();ctx.arc(sx,sy,px*1.2,0,Math.PI*2);ctx.fill();
+            const life = performance.now() - animStart;
+            const r = cinematic ? Math.min(px*1.8, px*0.6 + (life/250)*px*1.2) : px*1.2;
+            ctx.strokeStyle='rgba(255,115,0,0.7)'; ctx.lineWidth=3;
+            ctx.beginPath();ctx.arc(sx,sy,r,0,Math.PI*2);ctx.stroke();
+            // radial particles
+            if (life < 60){
+              for (let i=0;i<12;i++){
+                const a = Math.random()*Math.PI*2;
+                particles.push({x:(pos[0]), y:(pos[1]), vx:0.06*Math.cos(a), vy:0.06*Math.sin(a), life:400});
+              }
+            }
+            if (sfxEnabled && sfxTickStamp!==tick){ sfx('explode'); sfxTickStamp=tick; }
           }else if(act.type==='shield'){
             ctx.strokeStyle='blue';ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy,px/3+4,0,Math.PI*2);ctx.stroke();
+            if (sfxEnabled && sfxTickStamp!==tick) sfx('shield');
           }
         });
+      }
+      // particles
+      const nowp = performance.now();
+      particles = particles.filter(p=> p.life > 0);
+      for (const p of particles){
+        p.x += p.vx; p.y += p.vy; p.life -= 16;
+        ctx.globalAlpha = Math.max(0, p.life/400);
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath(); ctx.arc((p.x+0.5)*px, (p.y+0.5)*px, Math.max(2, px*0.06), 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      ctx.restore();
+
+      // floating damage texts
+      const nowt = performance.now();
+      damageTexts = damageTexts.filter(d=> nowt < d.end);
+      for (const d of damageTexts){
+        const life = 1 - (d.end - nowt)/d.dur;
+        const yoff = -life*18;
+        ctx.globalAlpha = 0.9*(1-life);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = `${Math.max(10, cellPixels()*0.4)}px sans-serif`;
+        ctx.fillText(d.text, (d.x+0.5)*px, (d.y+0.2)*px + yoff);
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -269,15 +643,85 @@
           const sh = frame.shields?.[selectedBotId] ?? 0;
           document.getElementById('bot-info').textContent = `Bot ${friendlyName(selectedBotId)} | HP: ${hp} | Power CD: ${cd} | Shield: ${sh}`;
         }
+        // live damage stats
+        const {dmg: live, kills: liveKills} = computeLiveDamageMap(tick);
+        if (live){
+          const div = document.getElementById('bot-stats');
+          const items = Object.keys(frames[0]?.positions||{}).map(bid=>({
+            bid,
+            name: friendlyName(bid),
+            dmg: live[bid]||0,
+            kills: liveKills[bid]||0,
+            teamPrefix: bid.split('-')[0]
+          })).sort((a,b)=> b.dmg - a.dmg);
+          // pin selected on top if option set
+          if (document.getElementById('pinSelected').checked && selectedBotId){
+            items.sort((a,b)=> (a.bid===selectedBotId?-1:(b.bid===selectedBotId?1:0)) || (b.dmg - a.dmg));
+          }
+          const maxDmg = Math.max(1, ...items.map(i=>i.dmg));
+          const frag = document.createDocumentFragment();
+          items.forEach(it=>{
+            const row = document.createElement('div'); row.className='row';
+            const bar = document.createElement('div'); bar.className='bar'; bar.style.width = `${Math.round((it.dmg/maxDmg)*100)}%`;
+            const left = document.createElement('div'); left.className='name';
+            left.innerHTML = `<span class=\"dot\" style=\"background:${(teamsMeta.find(t=>t.prefix===it.teamPrefix)? '#'+(teamsMeta.find(t=>t.prefix===it.teamPrefix).prefix):'#999')}\"></span><span>${it.name}</span>`;
+            const right = document.createElement('div'); right.className='val'; right.textContent = `${it.dmg}`;
+            if (it.kills){ const k=document.createElement('span'); k.className='badge'; k.textContent = `${it.kills} K`; right.appendChild(k); }
+            row.appendChild(bar); row.appendChild(left); row.appendChild(right);
+            frag.appendChild(row);
+          });
+          div.innerHTML=''; div.appendChild(frag);
+        }
+        updateInspector();
       }
     }
 
-    function loop() {
-      if (!playing) return;
+    function step(ts){
       render();
-      const len = frames.length;
-      tick = (tick + (reverseMode? -1: 1) + len) % len;
-      timer = setTimeout(loop, interval);
+      if (playing){
+        if (ts - animStart >= tickMs){
+          // advance tick
+          const prevFrame = frames[tick];
+          const nextTick = (tick + (reverseMode? -1: 1) + frames.length) % frames.length;
+          // spawn damage texts based on HP delta
+          const nextFrame = frames[nextTick];
+          for (const bid in nextFrame.hp){
+            const prevHP = prevFrame.hp?.[bid] ?? nextFrame.hp[bid];
+            const currHP = nextFrame.hp[bid];
+            const delta = prevHP - currHP;
+            if (delta > 0){
+              const pos = nextFrame.positions[bid];
+              if (pos){ damageTexts.push({x:pos[0], y:pos[1], text:`-${delta}`, dur:450, end: performance.now()+450}); }
+            }
+          }
+          tick = nextTick;
+          // if playing events only, skip frames without notable events
+          if (playEventsOnly){
+            let i = tick; let found = false;
+            while (i < frames.length){
+              const ev = frames[i].events||[];
+              if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { found=true; break; }
+              i++;
+            }
+            if (!found){ playing=false; showEndPanel(); return; } else { tick = i; }
+          }
+          animStart = ts;
+          // stop and show end-panel if reached last frame and not looping
+          if (!reverseMode && tick === frames.length-1){
+            playing = false; showEndPanel();
+          }
+          // show elimination toast
+          const ev = frames[tick].events||[];
+          const kill = ev.find(s=>s.startsWith('☠️'));
+          if (kill){
+            const toast=document.getElementById('toast');
+            toast.textContent = kill;
+            toast.style.display='block';
+            setTimeout(()=>{ toast.style.display='none'; }, 1200);
+          }
+        }
+      }
+      rafId = requestAnimationFrame(step);
     }
 
     function buildLog() {
@@ -331,28 +775,93 @@
 
     GRID_CANVAS.addEventListener('click', (e)=>{
       const bid = nearestBotIdAtCanvas(e.clientX, e.clientY);
-      if (bid) { selectedBotId = bid; render(); }
+      if (bid) {
+        selectedBotId = bid;
+        const botSel = document.getElementById('inspect-bot');
+        if (botSel) botSel.value = bid;
+        render();
+        updateInspector();
+      }
     });
+    GRID_CANVAS.addEventListener('mousemove', (e)=>{
+      const bid = nearestBotIdAtCanvas(e.clientX, e.clientY);
+      const t = document.getElementById('tooltip');
+      if (bid){
+        const rect = GRID_CANVAS.getBoundingClientRect();
+        t.style.left = (e.clientX+10) + 'px';
+        t.style.top = (e.clientY+10) + 'px';
+        const frame = frames[tick];
+        const hp = frame.hp?.[bid] ?? '-';
+        t.textContent = `${friendlyName(bid)} | HP ${hp}`;
+        t.style.display = 'block';
+      } else {
+        t.style.display = 'none';
+      }
+    });
+
+    function renderBotStats(){
+      const div = document.getElementById('bot-stats');
+      const items = Object.keys(frames[0]?.positions||{}).map(bid=>({
+        bid,
+        name: friendlyName(bid),
+        dmg: summaryDamageByBot[bid]||0,
+        teamPrefix: bid.split('-')[0]
+      })).sort((a,b)=> b.dmg - a.dmg);
+      const frag = document.createDocumentFragment();
+      items.forEach(it=>{
+        const row = document.createElement('div'); row.className='row';
+        const left = document.createElement('div');
+        left.innerHTML = `<span class="dot" style="background:${(teamsMeta.find(t=>t.prefix===it.teamPrefix)? '#'+(teamsMeta.find(t=>t.prefix===it.teamPrefix).prefix):'#999')}"></span><span class="name">${it.name}</span>`;
+        const right = document.createElement('div'); right.textContent = it.dmg;
+        row.appendChild(left); row.appendChild(right);
+        frag.appendChild(row);
+      });
+      div.innerHTML=''; div.appendChild(frag);
+    }
+
+    function showEndPanel(){
+      document.getElementById('end-title').textContent = 'Match Finished';
+      const winner = metaInfo?.winner_team_id ? (teamsMeta.find(t=>t.id===metaInfo.winner_team_id)?.name || 'Winner') : 'Draw';
+      let mvp = '';
+      if (summaryDamageByBot){
+        let bestBid = null, bestD= -1;
+        Object.entries(summaryDamageByBot).forEach(([bid, dmg])=>{ if (dmg>bestD){bestD=dmg; bestBid=bid;} });
+        if (bestBid){ mvp = `${friendlyName(bestBid)} (${bestD} dmg)`; }
+      }
+      const mvpLine = mvp ? `<div><strong>MVP:</strong> ${mvp}</div>` : `<div><strong>MVP:</strong> Not available</div>`;
+      document.getElementById('end-body').innerHTML = `<div><strong>Winner:</strong> ${winner}</div><div><strong>Total turns:</strong> ${frames.length}</div>${mvpLine}`;
+      document.getElementById('end-panel').style.display='flex';
+    }
 
     (async function init() {
       try {
         const metaRes = await fetch(`http://localhost:8000/matches/${matchId}`);
         const meta = await metaRes.json();
+        metaInfo = meta;
         if (meta.status !== 'finished') {
           document.getElementById('info').textContent = `Match still ${meta.status}. Refresh later.`;
           return;
         }
         gridSize = meta.mode === 'duo' ? 10 : 15;
         teamsMeta = (meta.teams||[]);
+        // populate team view dropdown
+        const tv = document.getElementById('team-view');
+        teamsMeta.forEach(t=>{
+          const opt=document.createElement('option');
+          opt.value=t.prefix; opt.textContent=t.name; tv.appendChild(opt);
+        });
+        tv.onchange = ()=>{ selectedTeamPrefix = tv.value; render(); };
 
         await fetchLog(`http://localhost:8000/matches/${matchId}/log`);
-        // set slider max
+        // consume summary tail for damage map
+        if (frames[frames.length-1]?.summary){ summaryDamageByBot = frames[frames.length-1].damage_by_bot || {}; frames.pop(); }
+        // set slider max after removing summary
         document.getElementById('slider').max = frames.length-1;
+        // build bot stats
+        renderBotStats();
         // slider drag handler
         document.getElementById('slider').oninput = (e)=>{
-          playing=false; clearTimeout(timer);
-          tick = parseInt(e.target.value);
-          render();
+          playing=false; tick = parseInt(e.target.value); animStart=performance.now(); render();
         };
         // build action log
         buildLog();
@@ -360,8 +869,31 @@
         if (!Number.isNaN(startTurnParam) && startTurnParam >=0 && startTurnParam < frames.length) {
           tick = startTurnParam;
         }
+        // build bot dropdown for inspect
+        const botSel = document.getElementById('inspect-bot');
+        Object.keys(frames[0]?.positions||{}).forEach(bid=>{ const opt=document.createElement('option'); opt.value=bid; opt.textContent=friendlyName(bid); botSel.appendChild(opt); });
+        if (selectedBotId) { botSel.value = selectedBotId; }
+        updateInspector();
         drawGrid();
         document.getElementById('info').textContent = 'Loaded. Press Play.';
+        // kick off RAF
+        if (!rafId) rafId=requestAnimationFrame(step);
+        // start banner
+        const tA = teamsMeta[0]?.name || 'Team A';
+        const tB = teamsMeta[1]?.name || (teamsMeta[1] ? teamsMeta[1].name : 'Team B');
+        const sb = document.getElementById('start-banner');
+        sb.textContent = `${tA} vs ${tB}`;
+        sb.style.opacity = 1;
+        setTimeout(()=>{ sb.style.opacity = 0; }, 1200);
+        // keyboard controls
+        window.addEventListener('keydown',(ev)=>{
+          if (ev.code==='Space'){ ev.preventDefault(); playing = !playing; if (playing){ animStart=performance.now(); if(!rafId) rafId=requestAnimationFrame(step);} }
+          if (ev.code==='ArrowLeft'){ playing=false; tick=Math.max(0,tick-1); render(); }
+          if (ev.code==='ArrowRight'){ playing=false; tick=Math.min(frames.length-1,tick+1); render(); }
+          if (ev.code==='KeyE'){ // next event
+            const btn=document.getElementById('nextEvent'); btn.click();
+          }
+        });
       } catch (err) {
         console.error(err);
       }
