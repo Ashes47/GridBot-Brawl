@@ -5,3 +5,5 @@ __pycache__/
 .cursorignore
 
 /data/
+
+local_match_*

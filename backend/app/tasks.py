@@ -92,8 +92,9 @@ def run_match(match_id: str, team_ids: List[str]) -> dict | None:
 
 
 @celery_app.task(name="app.tasks.run_baseline_test")
-def run_baseline_test(team_id: str) -> dict:
+def run_baseline_test(team_id: str, baseline_roster: List[str] | None = None) -> dict:
     """Create baseline team if needed, create Match, and enqueue run_match on baseline queue.
+    If baseline_roster provided, temporarily set baseline Team.roster to those 5 roles for this match.
     Returns {"match_id": str}.
     """
     from pathlib import Path
@@ -112,9 +113,9 @@ def run_baseline_test(team_id: str) -> dict:
         base_dir = Path(os.getenv("DATA_DIR", "./data/teams")) / "baseline"
         base_dir.mkdir(parents=True, exist_ok=True)
         bot_path = base_dir / "bot.py"
-        if not bot_path.exists():
-            src = Path(__file__).resolve().parent / "engine" / "baseline_bot.py"
-            bot_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        # Always refresh baseline code to pick up latest changes
+        src = Path(__file__).resolve().parent / "engine" / "baseline_bot.py"
+        bot_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
 
         # Create or reuse Team row for baseline
         name = "Baseline"
@@ -123,6 +124,15 @@ def run_baseline_test(team_id: str) -> dict:
             baseline_team = Team(name=name, code_path=str(bot_path), password_hash="!")
             session.add(baseline_team)
             session.flush()
+        else:
+            # Ensure code path up to date
+            baseline_team.code_path = str(bot_path)
+
+        # Optionally set roster
+        if baseline_roster and len(baseline_roster) == 5:
+            baseline_team.roster = json.dumps(baseline_roster)
+        else:
+            baseline_team.roster = None  # fallback to default
 
         match_id = uuid.uuid4()
         match = Match(

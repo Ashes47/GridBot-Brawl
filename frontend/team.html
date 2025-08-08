@@ -15,12 +15,14 @@
     .loss { background:#ef4444; }
     .draw { background:#facc15; color:#000; }
     .pill { padding:2px 6px; border-radius:12px; background:#e5e7eb; margin-right:4px; font-size:12px; }
+    .card { border:1px solid #e5e7eb; border-radius:8px; padding:6px; cursor:pointer; }
+    .card.selected { outline:3px solid #22c55e; }
   </style>
 </head>
 <body>
   <header class="site-header">
     <div class="nav">
-      <a class="brand" href="index.html">�� GridBot Brawl</a>
+      <a class="brand" href="index.html"> GridBot Brawl</a>
       <nav class="links">
         <a href="leaderboard.html?mode=duo">Leaderboards</a>
         <a href="teams.html">Teams</a>
@@ -31,9 +33,15 @@
   </header>
   <h1 id="team-name">Team</h1>
   <div id="components"></div>
-  <div style="margin:10px 0;">
+  <div style="margin:10px 0; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
     <button id="test-baseline">▶ Test vs Baseline</button>
-    <span id="test-status" style="margin-left:8px;color:#555;"></span>
+    <span id="test-status" style="color:#555;"></span>
+  </div>
+
+  <div id="baseline-picker" style="border:1px dashed #cbd5e1; padding:8px; border-radius:8px; margin-bottom:12px;">
+    <div style="font-weight:bold; margin-bottom:6px;">Baseline Roster (select 5 to override)</div>
+    <div id="baseline-cards" style="display:grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap:8px;"></div>
+    <div style="font-size:12px; color:#64748b; margin-top:4px;">If left empty, the baseline uses its default roster.</div>
   </div>
 
   <h3>Code & Roster Management</h3>
@@ -122,6 +130,7 @@
         const c = compMap[key];
         const span=document.createElement('span'); span.className='pill'; span.textContent = c? `${c.emoji} ${c.name}` : key; compDiv.appendChild(span);
       });
+
       // build roster picker cards
       const cardsDiv = document.getElementById('cards');
       const selected = new Set(roster);
@@ -129,14 +138,28 @@
         cardsDiv.innerHTML='';
         compsMeta.forEach(c=>{
           const div=document.createElement('div');
-          div.style.border='1px solid #e5e7eb'; div.style.borderRadius='8px'; div.style.padding='6px'; div.style.cursor='pointer';
-          if (selected.has(c.key)) div.style.outline='3px solid #22c55e';
+          div.className = 'card' + (selected.has(c.key) ? ' selected' : '');
           div.innerHTML = `<span style="font-size:18px;">${c.emoji}</span> <strong>${c.name}</strong> <span style="font-size:12px;color:#64748b;">CD ${c.cooldown}</span>`;
           div.onclick = ()=>{ if (selected.has(c.key)) selected.delete(c.key); else { if (selected.size<5) selected.add(c.key); } renderCards(); };
           cardsDiv.appendChild(div);
         });
       }
       renderCards();
+
+      // baseline picker (independent selection)
+      const baseDiv = document.getElementById('baseline-cards');
+      const baseSelected = new Set();
+      function renderBaselineCards(){
+        baseDiv.innerHTML='';
+        compsMeta.forEach(c=>{
+          const div=document.createElement('div');
+          div.className = 'card' + (baseSelected.has(c.key) ? ' selected' : '');
+          div.innerHTML = `<span style="font-size:18px;">${c.emoji}</span> <strong>${c.name}</strong> <span style="font-size:12px;color:#64748b;">CD ${c.cooldown}</span>`;
+          div.onclick = ()=>{ if (baseSelected.has(c.key)) baseSelected.delete(c.key); else { if (baseSelected.size<5) baseSelected.add(c.key); } renderBaselineCards(); };
+          baseDiv.appendChild(div);
+        });
+      }
+      renderBaselineCards();
 
       const duoBody = document.querySelector('#duo-table tbody');
       const quadBody = document.querySelector('#quad-table tbody');
@@ -184,7 +207,10 @@
         const statusEl = document.getElementById('test-status');
         statusEl.textContent = 'Queuing match…';
         try {
-          const res = await fetch(`http://localhost:8000/simulate/vs_baseline?team_id=${teamId}`, { method: 'POST' });
+          const rosterOverride = Array.from(baseSelected);
+          const body = { team_id: teamId };
+          if (rosterOverride.length === 5) body.baseline_roster = rosterOverride;
+          const res = await fetch(`http://localhost:8000/simulate/vs_baseline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           if (!res.ok) {
             statusEl.textContent = 'Failed to queue match';
             alert('Failed: ' + (await res.text()));

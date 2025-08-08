@@ -22,6 +22,7 @@ from .engine import (
     TURN_LIMIT,
 )
 
+
 def safe_position_from_dict(target_dict: dict, grid_size: int) -> "Position":
     """
     Safely create a Position from a dictionary, ensuring coordinates are within valid bounds.

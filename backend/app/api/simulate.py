@@ -19,6 +19,11 @@ class SimulateRequest(BaseModel):
     team_ids: List[str] = Field(..., min_items=2, max_items=4)
 
 
+class BaselineRequest(BaseModel):
+    team_id: str
+    baseline_roster: List[str] | None = None  # 5 role keys from metadata
+
+
 @router.post("/duo")
 async def simulate_duo(req: SimulateRequest, session: AsyncSession = Depends(get_session)):
     if len(req.team_ids) != 2:
@@ -65,21 +70,32 @@ async def simulate_quad(req: SimulateRequest, session: AsyncSession = Depends(ge
 
 
 @router.post("/vs_baseline")
-async def simulate_vs_baseline(team_id: str, session: AsyncSession = Depends(get_session)):
+async def simulate_vs_baseline(req: BaselineRequest, session: AsyncSession = Depends(get_session)):
     """Create a duo match of given team vs built-in baseline bot.
+    Optionally override baseline roster (5 roles).
     Returns a match_id to view in viewer.
     """
     # Ensure team exists
     from sqlalchemy import select as _select
-    res = await session.execute(_select(Team).where(Team.id == uuid.UUID(team_id)))
+    try:
+        tid = uuid.UUID(req.team_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid team_id")
+    res = await session.execute(_select(Team).where(Team.id == tid))
     t = res.scalar_one_or_none()
     if not t:
         raise HTTPException(status_code=404, detail="team not found")
 
+    # Basic validation of baseline roster
+    roster = req.baseline_roster or []
+    if roster:
+        if len(roster) != 5:
+            raise HTTPException(status_code=400, detail="baseline_roster must have exactly 5 roles")
+        # Leave detailed validation to the simulation which maps to Role enum; here we ensure strings
+        if not all(isinstance(x, str) and x for x in roster):
+            raise HTTPException(status_code=400, detail="baseline_roster entries must be strings")
 
-    match_id = uuid.uuid4()
     # Let Celery create the baseline match and return id
-
-    # let Celery task create baseline team and match consistently
-    res = run_baseline_test.apply_async(args=[team_id], queue="baseline")
-    return {"match_id": res.get(timeout=10).get("match_id"), "status": "pending"}
+    res = run_baseline_test.apply_async(args=[req.team_id, roster or None], queue="baseline")
+    out = res.get(timeout=10)
+    return {"match_id": out.get("match_id"), "status": "pending"}

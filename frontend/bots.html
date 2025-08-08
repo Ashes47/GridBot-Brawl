@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bots – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 30px auto; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px,1fr)); gap: 16px; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .title { display:flex; align-items:center; gap:8px; font-size:20px; margin-bottom: 8px; }
+    .meta { font-size:12px; color:#64748b; margin-bottom:8px; }
+    .power-desc { font-size:14px; background:#f8fafc; padding:8px; border-radius:6px; margin-bottom:12px; border-left:3px solid #3b82f6; }
+    .section { margin: 12px 0 8px; font-weight:bold; font-size:14px; color:#1f2937; }
+    .content { font-size:13px; line-height:1.4; margin-bottom:8px; }
+    .synergy { background:#ecfdf5; padding:6px; border-radius:4px; border-left:3px solid #10b981; }
+    .counter { background:#fef2f2; padding:6px; border-radius:4px; border-left:3px solid #ef4444; }
+    .tips { background:#fffbeb; padding:6px; border-radius:4px; border-left:3px solid #f59e0b; }
+    code { background:#f3f4f6; padding:1px 4px; border-radius:4px; font-size:12px; }
+    .damage { color:#dc2626; font-weight:bold; }
+    .range { color:#2563eb; font-weight:bold; }
+    .cooldown { color:#7c3aed; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav">
+      <a class="brand" href="index.html"> GridBot Brawl</a>
+      <nav class="links">
+        <a href="leaderboard.html?mode=duo">Leaderboards</a>
+        <a href="teams.html">Teams</a>
+        <a href="signup.html">Signup</a>
+        <a href="guide.html">Guide</a>
+        <a href="bots.html">Bots</a>
+      </nav>
+    </div>
+  </header>
+
+  <h1>🤖 Complete Bot Guide & Strategies</h1>
+  <p>Master all 18 unique bots with detailed breakdowns of powers, positioning, synergies, and advanced tactics. Choose your 5-bot roster wisely!</p>
+
+  <div style="margin: 20px 0; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+    <strong>💡 Core Mechanics:</strong> All bots have 100 HP, deal 20 base attack damage (except Bruiser: 30), and share vision radius of 4 tiles. Powers have cooldowns and can be silenced or jammed.
+  </div>
+
+  <div id="bots" class="grid"></div>
+
+  <script>
+    async function loadBots(){
+      const res = await fetch('http://localhost:8000/metadata/components');
+      const comps = (await res.json()).components || [];
+      const container = document.getElementById('bots');
+      
+      const botDetails = {
+        tank: {
+          strategy: 'Premier frontliner and damage sponge. Position aggressively to draw fire, use shield reactively when overwhelmed (2+ enemies adjacent or <60 HP). Body-block key lanes to protect backline.',
+          synergies: 'Healer (sustain), Shield Giver (pre-combat buffs), Bruiser (dual frontline), Bomber (explosive follow-up after tanking)',
+          counters: 'Vulnerable to: Poisoner (DoT bypasses shield), Jammer (blocks shield timing), Puller (removes from formation)',
+          positioning: 'Lead engagements, contest center map control. Stay within heal/shield range of supports but ahead of damage dealers.',
+          tips: 'Shield timing is crucial - too early wastes it, too late and you\'re dead. Use shield when enemies commit, not when poking. Can tank ~133 damage with perfect shield usage.'
+        },
+        sniper: {
+          strategy: 'Elite damage dealer requiring straight-line positioning. Prioritize high-value targets within 5-tile range. Kite when pressured, reposition for clean shots.',
+          synergies: 'Wall Builder (creates shooting lanes), Reflector (protects vs enemy snipers), Silencer (removes enemy defensive powers)',
+          counters: 'Hard-countered by: Decoy Caster (blocks LoS), Wall Builder (breaks lanes), Scout (gap closer), mobility bots',
+          positioning: 'Backline with clear sightlines. Align on rows/columns with priority targets. Stay 3+ tiles from enemies to avoid dashes.',
+          tips: '40 damage per shot can 3-shot most targets. Pre-aim common positions. Use terrain and allies to maintain distance. Focus enemy supports first.'
+        },
+        bomber: {
+          strategy: 'High-risk, high-reward AoE specialist. Dive enemy clusters for 2+ target explosions, or trade when low HP. Threaten space with explosion threat.',
+          synergies: 'Tank (draws enemies close), Puller (groups enemies), Scout (gap closing), Trap Setter (area denial combo)',
+          counters: 'Weak to: Pusher (denies positioning), Jammer (blocks explosion timing), ranged focus fire, kiting strategies',
+          positioning: 'Mid-range threat range. Dive when enemies clump, retreat when isolated. Use explosion threat to control space.',
+          tips: 'Explosion deals 30 AoE + 10 self-damage. Best used on 2+ enemies or when <30 HP for value trades. Can zone enemies from tight spaces.'
+        },
+        scout: {
+          strategy: 'Mobile skirmisher with hit-and-run tactics. Use dash for engage/disengage, kite slower enemies, pick off isolated targets.',
+          synergies: 'Sniper (mobile screening), Healer (sustain for prolonged skirmishing), Jammer (setup dashes), Leaper (dual mobility)',
+          counters: 'Struggles vs: Teleporter (hard to pin), Reflector (punishes predictable dashes), heavy sustain comps',
+          positioning: 'Flanks and edges, ready to dash in/out. Target backline when possible, retreat before being surrounded.',
+          tips: '2-tile dash requires both tiles empty. Use for repositioning over damage. Can dash away from adjacent enemies for escape.'
+        },
+        teleporter: {
+          strategy: 'Defensive repositioning specialist. Blink when overwhelmed or to escape focus fire. Re-enter fights from unexpected angles.',
+          synergies: 'Bomber (blink out after explosion), supports who benefit from protection, fragile high-value bots',
+          counters: 'Limited by: map control, RNG positioning after blink, long cooldown windows, persistent AoE effects',
+          positioning: 'Aggressive early, ready to blink defensively. Use unpredictable positioning to threaten enemy backline.',
+          tips: 'Blink is random but always to empty tiles. Use when 2+ enemies adjacent or <35 HP. Can blink into better positions for kills.'
+        },
+        poisoner: {
+          strategy: 'DoT specialist requiring close positioning. Tag high-priority targets at range 1, stack poison on tanks, synergize with control.',
+          synergies: 'Puller (brings targets in range), Trap Setter (area control), Bruiser (frontline buddy), control bots',
+          counters: 'Countered by: Healer (removes DoT), range advantage, mobility that denies range-1 positioning',
+          positioning: 'Aggressive positioning behind tanks. Get in range-1 of priority targets, apply poison, retreat safely.',
+          tips: 'Poison stacks deal 10 damage/turn for 3 turns. Multiple stacks = 30+ damage over time. Focus one target for max effect.'
+        },
+        trap_setter: {
+          strategy: 'Area control specialist. Plant traps on key paths, objectives, chokepoints. Combo with displacement effects to trigger.',
+          synergies: 'Puller/Pusher (forced movement into traps), Wall Builder (funnel paths), any displacement effects',
+          counters: 'Limited by: mobile enemies who avoid traps, ranged comps that don\'t path through them, trap limits (3 max)',
+          positioning: 'Predict enemy movement, place traps on common paths. Stay mobile to plant in new locations.',
+          tips: 'Traps deal 20 AoE damage in 3x3 area. Invisible to enemies until triggered. Plant before fights, not during.'
+        },
+        healer: {
+          strategy: 'Sustain enabler allowing prolonged fights. Heal frontliners within 2 tiles, prioritize keeping tanks/bruisers alive.',
+          synergies: 'Tank (primary heal target), Bruiser (sustain trades), any frontline bots, Shield Giver (defensive synergy)',
+          counters: 'Priority target for: Silencer, Sniper, Scout. Vulnerable when isolated or out of position',
+          positioning: 'Mid-range support, 2 tiles from frontline. Balance safety with heal range. Predict damage and pre-heal.',
+          tips: 'Heals 30 HP within 2-tile range. Can heal same target multiple times. Keep frontliners above 70 HP when possible.'
+        },
+        shield_giver: {
+          strategy: 'Proactive protection specialist. Project shields before engagements within 3-tile range. Enable risky plays.',
+          synergies: 'Sniper (protection while aiming), Bomber (protection during dives), Tank (double defense), any glass cannons',
+          counters: 'Limited impact vs: DoT effects, multi-hit combos, being focused down first',
+          positioning: 'Safe backline with 3-tile range to key allies. Shield before fights, not during.',
+          tips: 'Projected shields last 1 turn, reduce 75% of 40 damage. Best used on allies about to take focus fire.'
+        },
+        puller: {
+          strategy: 'Formation disruptor bringing enemies into kill range. Pull priority targets into your team or traps within 3 tiles.',
+          synergies: 'Trap Setter (pull into traps), Bomber (group for explosion), Bruiser (pull into melee range), any burst damage',
+          counters: 'Blocked by: LoS denial, Decoy Caster, Wall Builder. Jammed pulls miss 50% of the time',
+          positioning: 'Mid-range with LoS to priority targets. Pull enemy supports into your frontline.',
+          tips: 'Requires straight-line LoS within 3 tiles. Pulls target 1 tile closer. Can break enemy formations.'
+        },
+        bruiser: {
+          strategy: 'Enhanced frontline fighter with 30 damage attacks. Trade favorably, pressure enemy frontline, pair with sustain.',
+          synergies: 'Healer (sustain trades), Shield Giver (protection), Tank (dual frontline), any sustain effects',
+          counters: 'Weak to: kiting, ranged focus fire, Poisoner (negates HP advantage), mobility that denies melee',
+          positioning: 'Aggressive frontline, focus enemy tanks/bruisers. Use higher damage to win trades.',
+          tips: '30 base attack damage vs normal 20. No power cooldown - passive advantage. Can 4-shot enemies vs their 5-shots.'
+        },
+        jammer: {
+          strategy: 'Disruption specialist affecting 3-tile radius. Scramble before enemy power spikes, reduce reliability for 2 turns.',
+          synergies: 'Any burst windows when enemies can\'t respond with powers. Works with any aggressive strategy',
+          counters: 'Limited by: positioning requirements, affects friendlies in range, doesn\'t stop basic attacks',
+          positioning: 'Get within 3 tiles of enemy cluster before key moments. Time scrambles before big fights.',
+          tips: 'Jammed enemies have 50% miss chance on powers for 2 turns. Affects all enemies in 3-tile radius.'
+        },
+        reflector: {
+          strategy: 'Defensive specialist punishing predictable attacks. Mirror before likely snipes/attacks, reflect damage back.',
+          synergies: 'Positioning with other high-priority targets to bait attacks, works with any defensive strategy',
+          counters: 'Limited by: timing requirements, single-use per activation, doesn\'t help vs basic positioning',
+          positioning: 'Position as bait for enemy powers. Use mirror when expecting snipes or key attacks.',
+          tips: 'Reflects next attack back to attacker. Single use per mirror. Best vs high-damage powers like snipe.'
+        },
+        wall_builder: {
+          strategy: 'Terrain control specialist creating 5-turn walls. Build cover, funnel enemies, protect key positions.',
+          synergies: 'Sniper (creates shooting lanes), Trap Setter (funnel into traps), any defensive positioning',
+          counters: 'Limited by: 3 wall maximum, temporary duration, doesn\'t stop AoE or powers',
+          positioning: 'Build walls tactically - cover for allies, block enemy advances, create favorable terrain.',
+          tips: 'Walls last 5 turns, block movement and LoS. Max 3 per team. Place adjacent to yourself only.'
+        },
+        pusher: {
+          strategy: 'Defensive positioning specialist. Push threats away from backline, disrupt enemy formations.',
+          synergies: 'Protects any backline units, combos with Trap Setter (push into traps), defensive strategies',
+          counters: 'Limited by: range requirement (adjacent only), mobile enemies can reposition quickly',
+          positioning: 'Protect backline, be ready to push adjacent threats away from key allies.',
+          tips: 'Pushes adjacent enemies 1 tile away. Use to save allies or push enemies into bad positions.'
+        },
+        decoy_caster: {
+          strategy: 'LoS denial specialist. Spawn 1 HP decoys to block important sightlines, buy time, disrupt targeting.',
+          synergies: 'Protects Sniper from enemy snipers, combos with any LoS-dependent strategies',
+          counters: 'Limited by: 1 HP decoys die easily, only 1 decoy per caster, temporary solution',
+          positioning: 'Place decoys strategically to block key sightlines. Use for protection and area denial.',
+          tips: 'Decoys have 1 HP, last 3 turns, block LoS and movement. Only 1 active per caster.'
+        },
+        leaper: {
+          strategy: 'Flanking specialist with diagonal mobility. Leap over obstacles to reach enemy backline, avoid frontline.',
+          synergies: 'Sniper (mobile protection), works with any backline pressure strategies',
+          counters: 'Limited by: positioning requirements (must leap over blocker), predictable landing spots',
+          positioning: 'Use diagonal leaps to flank around frontlines. Target enemy supports and isolated units.',
+          tips: 'Leaps diagonally 2 tiles, must jump over a blocker (bot/wall). Can bypass frontlines.'
+        },
+        silencer: {
+          strategy: 'Power disruption specialist. Silence key enemy abilities within 3 tiles for 2 turns, requires LoS.',
+          synergies: 'Combos with any burst strategies when enemies can\'t respond with powers',
+          counters: 'Limited by: LoS requirements, range limitations, doesn\'t affect basic attacks',
+          positioning: 'Get LoS to priority targets within 3 tiles. Silence before key moments.',
+          tips: 'Silenced enemies can\'t use powers for 2 turns. Requires LoS within 3 tiles. Priority: supports, defensive powers.'
+        }
+      };
+
+      comps.forEach(c => {
+        const details = botDetails[c.key] || {};
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <div class="title">
+            <span style="font-size:24px;">${c.emoji}</span> 
+            <strong>${c.name}</strong>
+            <span style="margin-left:auto; font-size:12px; background:${c.color}; color:white; padding:2px 6px; border-radius:12px;">${c.role}</span>
+          </div>
+          <div class="meta">
+            Key: <code>${c.key}</code> · 
+            Cooldown: <span class="cooldown">${c.cooldown}</span> · 
+            Power: <code>${c.power}</code>
+          </div>
+          
+          <div class="power-desc">${c.description}</div>
+          
+          <div class="section">🎯 Strategy & Usage</div>
+          <div class="content">${details.strategy || 'Core combat unit with standard tactical applications.'}</div>
+          
+          <div class="section">🤝 Synergies</div>
+          <div class="content synergy">${details.synergies || 'Works well with most team compositions.'}</div>
+          
+          <div class="section">⚔️ Counters & Weaknesses</div>
+          <div class="content counter">${details.counters || 'Vulnerable to focus fire and good positioning.'}</div>
+          
+          <div class="section">📍 Positioning</div>
+          <div class="content">${details.positioning || 'Standard positioning based on role and situation.'}</div>
+          
+          <div class="section">💡 Advanced Tips</div>
+          <div class="content tips">${details.tips || 'Master the basics before attempting advanced plays.'}</div>
+        `;
+        container.appendChild(div);
+      });
+    }
+    loadBots();
+  </script>
+
+  <div style="margin-top: 40px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+    <h3>🏆 Team Composition Guidelines</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px;">
+      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #10b981;">
+        <strong>🛡️ Balanced Core:</strong> Tank + Sniper + Healer + Scout + Bomber<br>
+        <small>Reliable composition with good sustain and mixed damage types.</small>
+      </div>
+      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #3b82f6;">
+        <strong>⚡ Aggressive Rush:</strong> Bruiser + Scout + Bomber + Pusher + Jammer<br>
+        <small>High-pressure composition focused on early fights and disruption.</small>
+      </div>
+      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #7c3aed;">
+        <strong>🎯 Control Setup:</strong> Sniper + Wall Builder + Trap Setter + Puller + Silencer<br>
+        <small>Methodical composition controlling space and forcing favorable trades.</small>
+      </div>
+      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #f59e0b;">
+        <strong>🔄 Sustain Grind:</strong> Tank + Healer + Shield Giver + Reflector + Poisoner<br>
+        <small>Defensive composition that wins through superior sustain and DoT.</small>
+      </div>
+    </div>
+  </div>
+</body>
+</html> 
