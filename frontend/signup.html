@@ -6,10 +6,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; }
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; }
     label { display: block; margin-top: 12px; }
-    input[type="text"], input[type="file"] { width: 100%; padding: 8px; }
+    input[type="text"], input[type="file"], input[type="password"] { width: 100%; padding: 8px; }
     button { margin-top: 20px; padding: 10px 16px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap:10px; margin-top:8px; }
+    .card { border:1px solid #ddd; border-radius:8px; padding:8px; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .card.selected { outline: 3px solid #22c55e; }
+    .emoji { font-size: 20px; }
+    .pill { padding:2px 6px; border-radius:999px; font-size:12px; background:#f1f5f9; }
   </style>
 </head>
 <body>
@@ -38,7 +43,15 @@
       <input type="password" name="password" minlength="6" required>
     </label>
 
-    <!-- Code upload has moved to the Team page -->
+    <h3 style="margin-top:16px;">Select 5 Components (optional if you upload a bot file)</h3>
+    <div id="cards" class="grid"></div>
+    <div style="margin-top:6px; color:#64748b;">Pick exactly 5 unique components if you are not uploading a bot file. If you upload a file, we will auto-detect the first 5 component classes.</div>
+
+    <input type="hidden" name="roster" id="roster-field" value="">
+
+    <label style="margin-top:16px;">Upload Bot Code (single .py with component classes)
+      <input type="file" name="bot_file" id="bot-file" accept=".py">
+    </label>
 
     <button type="submit">Register Team</button>
   </form>
@@ -46,21 +59,51 @@
   <p id="result"></p>
 
   <script>
-    // Intercept form submission to show result without leaving page
     const form = document.getElementById('signup-form');
     const resultEl = document.getElementById('result');
+    const rosterField = document.getElementById('roster-field');
+    const cardsDiv = document.getElementById('cards');
+    const botInput = document.getElementById('bot-file');
+    let components = [];
+    let selected = new Set();
+
+    function renderCards(){
+      cardsDiv.innerHTML = '';
+      components.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.style.borderColor = '#e5e7eb';
+        div.style.background = '#fff';
+        if (selected.has(c.key)) div.classList.add('selected');
+        div.innerHTML = `<span class="emoji">${c.emoji}</span><div><div><strong>${c.name}</strong> <span class="pill" style="background:${c.color}20">${c.role}</span></div><div style="font-size:12px;color:#64748b;">CD ${c.cooldown} – ${c.description}</div></div>`;
+        div.onclick = () => {
+          if (selected.has(c.key)) { selected.delete(c.key); }
+          else { if (selected.size < 5) selected.add(c.key); }
+          renderCards();
+        };
+        cardsDiv.appendChild(div);
+      });
+    }
+
+    async function loadComponents(){
+      const res = await fetch('http://localhost:8000/metadata/components');
+      const data = await res.json();
+      components = data.components || [];
+      renderCards();
+    }
+    loadComponents();
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const hasFile = botInput && botInput.files && botInput.files.length > 0;
+      if (!hasFile && selected.size !== 5){ resultEl.textContent = 'Please select exactly 5 components or upload a bot file.'; return; }
+      rosterField.value = selected.size === 5 ? JSON.stringify(Array.from(selected)) : '';
       const formData = new FormData(form);
       try {
-        const res = await fetch(form.action, {
-          method: 'POST',
-          body: formData
-        });
+        const res = await fetch(form.action, { method: 'POST', body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Error');
         resultEl.innerHTML = `<strong>Success!</strong> Redirecting to team page…`;
-        // Redirect to team page where they can test vs baseline and later submit
         window.location.href = `team.html?id=${data.id}`;
       } catch (err) {
         resultEl.textContent = 'Error: ' + err.message;

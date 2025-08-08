@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy import text
 import json as _json
 import shutil
+from passlib.hash import bcrypt
 
 from ..database import get_session
 from ..db_models import Member, Team
@@ -21,26 +22,77 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data/teams"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-REQUIRED_BOT_CLASSES = {"Sniper", "Tank", "Bomber", "Scout", "Teleporter"}
 MAX_FILE_SIZE_BYTES = 32 * 1024  # 32 KB limit
 
+# mapping from component key to expected class name in code
+COMPONENT_CLASS_NAME = {
+    "tank": "Tank",
+    "sniper": "Sniper",
+    "bomber": "Bomber",
+    "scout": "Scout",
+    "teleporter": "Teleporter",
+    "poisoner": "Poisoner",
+    "trap_setter": "Trap_Setter",
+    "healer": "Healer",
+    "shield_giver": "Shield_Giver",
+    "puller": "Puller",
+    "bruiser": "Bruiser",
+    "jammer": "Jammer",
+    "reflector": "Reflector",
+    "wall_builder": "Wall_Builder",
+    "pusher": "Pusher",
+    "decoy_caster": "Decoy_Caster",
+    "leaper": "Leaper",
+    "silencer": "Silencer",
+}
 
-def _validate_bot_file(code: str) -> None:
-    """Parse the Python code and check for required bot class names."""
+# reverse map for class-name → component key
+CLASS_NAME_TO_COMPONENT = {v: k for k, v in COMPONENT_CLASS_NAME.items()}
+
+# canonical role values to validate roster
+CANONICAL_COMPONENTS = set(COMPONENT_CLASS_NAME.keys())
+
+
+def _validate_code_contains_classes(code: str, class_names: List[str]) -> None:
     if len(code.encode("utf-8")) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="File too large")
     try:
         tree = ast.parse(code)
     except SyntaxError as exc:
         raise HTTPException(status_code=400, detail=f"Syntax error: {exc}") from exc
-
-    class_names = {node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
-    missing = REQUIRED_BOT_CLASSES - class_names
+    classes = {node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef)}
+    missing = [c for c in class_names if c not in classes]
     if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Missing required classes: {', '.join(sorted(missing))}",
-        )
+        raise HTTPException(status_code=400, detail=f"Missing required classes for roster: {', '.join(missing)}")
+
+
+def _extract_class_names_in_order(code: str) -> List[str]:
+    """Return top-level class names in source order. Also enforces file size and syntax validity."""
+    if len(code.encode("utf-8")) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="File too large")
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as exc:
+        raise HTTPException(status_code=400, detail=f"Syntax error: {exc}") from exc
+    return [node.name for node in getattr(tree, 'body', []) if isinstance(node, ast.ClassDef)]
+
+
+def _validate_roster_json(roster_json: str) -> List[str]:
+    try:
+        roster = _json.loads(roster_json or "[]")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid roster JSON")
+    if not isinstance(roster, list):
+        raise HTTPException(status_code=400, detail="Roster must be a JSON array")
+    if len(roster) != 5:
+        raise HTTPException(status_code=400, detail="Roster must contain exactly 5 components")
+    lowered = [str(x).lower() for x in roster]
+    if len(set(lowered)) != 5:
+        raise HTTPException(status_code=400, detail="Roster must contain 5 unique components")
+    for r in lowered:
+        if r not in CANONICAL_COMPONENTS:
+            raise HTTPException(status_code=400, detail=f"Invalid component: {r}")
+    return lowered
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -48,33 +100,60 @@ async def create_team(
     name: str = Form(..., max_length=100),
     members: str = Form(..., description="Comma-separated member names"),
     password: str = Form(..., min_length=6),
+    roster: str = Form(None, description="JSON array of 5 component strings (optional if bot_file provided)"),
     bot_file: UploadFile | None = File(None),
     session: AsyncSession = Depends(get_session),
 ):
-    """Register a team and optionally upload its bot code. If no code provided, a placeholder is created."""
+    """Register a team. If no roster provided but a bot file is uploaded, auto-detect the first 5 valid component classes found in the file."""
     # ensure unique name
     existing = await session.execute(select(Team).where(Team.name == name))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Team name already taken")
 
-    code_str: str
+    code_str: str | None = None
     if bot_file is not None:
-        # Read file content
         code_bytes = await bot_file.read()
         try:
             code_str = code_bytes.decode("utf-8")
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="File must be UTF-8 text")
-        _validate_bot_file(code_str)
+
+    # Determine roster list
+    roster_list: List[str]
+    if roster not in (None, ""):
+        roster_list = _validate_roster_json(roster)
     else:
-        # Minimal safe placeholder bot implementing required classes
-        code_str = (
-            "class Sniper:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
-            "class Tank:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
-            "class Bomber:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
-            "class Scout:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
-            "class Teleporter:\n    def decide(self, obs): return {\"type\": \"shield\"}\n"
-        )
+        if code_str is not None:
+            class_order = _extract_class_names_in_order(code_str)
+            auto: List[str] = []
+            seen: set[str] = set()
+            for cls in class_order:
+                key = CLASS_NAME_TO_COMPONENT.get(cls)
+                if key and key not in seen:
+                    auto.append(key)
+                    seen.add(key)
+                    if len(auto) == 5:
+                        break
+            if len(auto) < 5:
+                raise HTTPException(status_code=400, detail="Could not auto-detect 5 components from uploaded code. Define 5 component classes or select a roster manually.")
+            roster_list = auto
+        else:
+            # No code uploaded, default to first 5 canonical components
+            roster_list = list(COMPONENT_CLASS_NAME.keys())[:5]
+
+    required_classes = [COMPONENT_CLASS_NAME[k] for k in roster_list]
+
+    if code_str is None:
+        # Minimal safe placeholder bot implementing all classes to ease future roster changes
+        code_lines = []
+        for cls in COMPONENT_CLASS_NAME.values():
+            code_lines.append(
+                "class " + cls + ":\n    def decide(self, obs):\n        return {\"type\": \"move\", \"direction\": \"north\"}\n"
+            )
+        code_str = "\n".join(code_lines)
+    else:
+        # Validate uploaded code contains required classes
+        _validate_code_contains_classes(code_str, required_classes)
 
     # Persist file on disk
     team_id = uuid.uuid4()
@@ -84,8 +163,7 @@ async def create_team(
     file_path.write_text(code_str, encoding="utf-8")
 
     # Persist DB rows
-    from passlib.hash import bcrypt
-    team = Team(id=team_id, name=name, code_path=str(file_path), password_hash=bcrypt.hash(password))
+    team = Team(id=team_id, name=name, code_path=str(file_path), password_hash=bcrypt.hash(password), roster=_json.dumps(roster_list))
     member_objs: List[Member] = [Member(name=m.strip()) for m in members.split(",") if m.strip()]
     if len(member_objs) == 0:
         raise HTTPException(status_code=400, detail="At least one member required")
@@ -98,10 +176,8 @@ async def create_team(
         "id": str(team.id),
         "name": team.name,
         "members": [m.name for m in team.members],
+        "roster": roster_list,
     }
-
-
-# ------------------------------------------------------------ Update team code / name / members
 
 
 @router.put("/{team_id}")
@@ -110,6 +186,7 @@ async def update_team(
     name: str = Form(None),
     members: str = Form(None),
     password: str = Form(...),
+    roster: str = Form(None, description="JSON array of 5 component strings"),
     bot_file: UploadFile = File(None),
     session: AsyncSession = Depends(get_session),
 ):
@@ -130,22 +207,39 @@ async def update_team(
     if not bcrypt.verify(password, team.password_hash):
         raise HTTPException(status_code=403, detail="Invalid password")
 
+    # if roster provided, validate values and optionally code support
+    roster_list: Optional[List[str]] = None
+    if roster is not None:
+        roster_list = _validate_roster_json(roster)
+
     # handle bot file update
     if bot_file is not None:
         code_bytes = await bot_file.read()
         code_str = code_bytes.decode("utf-8", errors="replace")
-        _validate_bot_file(code_str)
-
+        # Determine which roster to validate against (incoming or existing)
+        roster_for_validation = roster_list if roster_list is not None else (_json.loads(team.roster) if team.roster else [])
+        required = [COMPONENT_CLASS_NAME[k] for k in roster_for_validation] if roster_for_validation else []
+        if required:
+            _validate_code_contains_classes(code_str, required)
         # overwrite existing file
         file_path = Path(team.code_path)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(code_str, encoding="utf-8")
 
+    # update roster only (no code): validate existing file contains necessary classes
+    if roster_list is not None and bot_file is None:
+        try:
+            code_on_disk = Path(team.code_path).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            raise HTTPException(status_code=400, detail="Team code file missing on server")
+        required = [COMPONENT_CLASS_NAME[k] for k in roster_list]
+        _validate_code_contains_classes(code_on_disk, required)
+        team.roster = _json.dumps(roster_list)
+
     # update name / members
     if name:
         team.name = name
     if members is not None:
-        # clear old members
         team.members.clear()
         team.members.extend([Member(name=m.strip()) for m in members.split(",") if m.strip()])
 
@@ -244,6 +338,7 @@ async def get_team(team_id: str, session: AsyncSession = Depends(get_session)):
         "name": team.name,
         "created_at": team.created_at,
         "members": [m.name for m in team.members],
+        "roster": (_json.loads(team.roster) if team.roster else None),
     }
 
 

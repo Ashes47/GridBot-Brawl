@@ -7,6 +7,7 @@ from .api.team import router as team_router
 from .api.simulate import router as simulate_router
 from .api.match import router as match_router
 from .api.leaderboard import router as leaderboard_router
+from .api.metadata import router as metadata_router
 
 
 app = FastAPI(title="GridBot Brawl API")
@@ -36,6 +37,7 @@ app.include_router(team_router)
 app.include_router(simulate_router)
 app.include_router(match_router)
 app.include_router(leaderboard_router)
+app.include_router(metadata_router)
 
 
 @app.get("/health")

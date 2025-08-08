@@ -17,6 +17,7 @@ class Team(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     members = relationship("Member", back_populates="team", cascade="all, delete-orphan")
     password_hash = Column(String(200), nullable=False)
+    roster = Column(Text, nullable=True)  # JSON-encoded list of 5 component strings
 
 
 class Member(Base):

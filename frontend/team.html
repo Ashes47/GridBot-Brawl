@@ -36,13 +36,21 @@
     <span id="test-status" style="margin-left:8px;color:#555;"></span>
   </div>
 
-  <h3>Code Management</h3>
-  <form id="upload-form" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-    <input type="file" name="bot_file" accept=".py" required>
+  <h3>Code & Roster Management</h3>
+  <form id="upload-form" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+    <input type="file" name="bot_file" accept=".py">
     <input type="password" name="password" placeholder="Team password" minlength="6" required>
     <button type="submit">Upload New Code</button>
     <span id="upload-status" style="color:#555;"></span>
   </form>
+  <div id="roster-picker" style="border:1px solid #e5e7eb; padding:8px; border-radius:8px;">
+    <div style="font-weight:bold; margin-bottom:6px;">Update Roster (select 5)</div>
+    <div id="cards" style="display:grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap:8px;"></div>
+    <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+      <button id="save-roster">Save Roster</button>
+      <span id="roster-status" style="color:#555;"></span>
+    </div>
+  </div>
 
   <div style="margin-top:10px;">
     <button id="submit-eval">Submit for evaluation</button>
@@ -94,19 +102,41 @@
       const r = await fetch(`http://localhost:8000/teams/${teamId}/matches`);
       return await r.json();
     }
+    async function fetchComponents(){
+      const r = await fetch('http://localhost:8000/metadata/components');
+      return (await r.json()).components || [];
+    }
     function shorten(id) { return id.slice(0,6)+'…'; }
 
     (async function init() {
-      const team = await fetchTeam();
+      const [team, compsMeta] = await Promise.all([fetchTeam(), fetchComponents()]);
       document.getElementById('team-name').textContent = team.name;
 
       const matches = await fetchMatches();
 
       // component pills
       const compDiv = document.getElementById('components');
-      const comps = ['Sniper','Tank','Bomber','Scout','Teleporter'];
-      comps.forEach(c=>{
-        const span=document.createElement('span'); span.className='pill'; span.textContent=c; compDiv.appendChild(span);});
+      const roster = Array.isArray(team.roster) ? team.roster : [];
+      const compMap = Object.fromEntries(compsMeta.map(c=>[c.key,c]));
+      roster.forEach(key=>{
+        const c = compMap[key];
+        const span=document.createElement('span'); span.className='pill'; span.textContent = c? `${c.emoji} ${c.name}` : key; compDiv.appendChild(span);
+      });
+      // build roster picker cards
+      const cardsDiv = document.getElementById('cards');
+      const selected = new Set(roster);
+      function renderCards(){
+        cardsDiv.innerHTML='';
+        compsMeta.forEach(c=>{
+          const div=document.createElement('div');
+          div.style.border='1px solid #e5e7eb'; div.style.borderRadius='8px'; div.style.padding='6px'; div.style.cursor='pointer';
+          if (selected.has(c.key)) div.style.outline='3px solid #22c55e';
+          div.innerHTML = `<span style="font-size:18px;">${c.emoji}</span> <strong>${c.name}</strong> <span style="font-size:12px;color:#64748b;">CD ${c.cooldown}</span>`;
+          div.onclick = ()=>{ if (selected.has(c.key)) selected.delete(c.key); else { if (selected.size<5) selected.add(c.key); } renderCards(); };
+          cardsDiv.appendChild(div);
+        });
+      }
+      renderCards();
 
       const duoBody = document.querySelector('#duo-table tbody');
       const quadBody = document.querySelector('#quad-table tbody');
@@ -186,6 +216,20 @@
           alert('Upload failed: ' + err.message);
         }
       });
+
+      // Save roster
+      document.getElementById('save-roster').onclick = async ()=>{
+        const statusEl = document.getElementById('roster-status');
+        if (selected.size !== 5){ statusEl.textContent = 'Pick exactly 5'; return; }
+        const pwd = prompt('Enter team password to save roster');
+        if (!pwd){ statusEl.textContent='Cancelled'; return; }
+        const form = new FormData();
+        form.append('password', pwd);
+        form.append('roster', JSON.stringify(Array.from(selected)));
+        statusEl.textContent = 'Saving…';
+        const res = await fetch(`http://localhost:8000/teams/${teamId}`, { method: 'PUT', body: form });
+        if (res.ok){ statusEl.textContent = 'Saved'; } else { statusEl.textContent = 'Failed'; alert(await res.text()); }
+      };
 
       // Submit for evaluation: enqueue leaderboard matches via Celery
       document.getElementById('submit-eval').onclick = async () => {

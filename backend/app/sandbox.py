@@ -55,26 +55,26 @@ def _load_module_from_path(path: Path) -> types.ModuleType:
     return module
 
 
-def _ensure_classes(module: types.ModuleType):
-    order = ["Sniper", "Tank", "Bomber", "Scout", "Teleporter"]
-    classes = {name: cls for name, cls in module.__dict__.items() if isinstance(cls, type)}
-    missing = set(order) - classes.keys()
-    if missing:
-        raise ValueError(f"Missing bot classes: {', '.join(missing)}")
-    return [classes[name] for name in order]
-
-
 # ---------------- Public API ----------------
 
 
-def load_team(team_id: str, file_path: str, bot_ids: List[str]) -> TeamController:
-    """Load bot classes and capture module/class identities bound to bot_ids order ROLE_ORDER."""
+def load_team(team_id: str, file_path: str, bot_class_map: Dict[str, str]) -> TeamController:
+    """Load bot classes and capture module/class identities per provided map.
+
+    :param bot_class_map: mapping of bot_id -> class_name to load from the module
+    """
     module = _load_module_from_path(Path(file_path))
-    class_list = _ensure_classes(module)
+    classes = {name: cls for name, cls in module.__dict__.items() if isinstance(cls, type)}
 
     bots: Dict[str, BotProxy] = {}
-    for bot_id, cls in zip(bot_ids, class_list):
-        bots[bot_id] = BotProxy(module_path=str(Path(file_path)), class_name=cls.__name__)
+    missing: List[str] = []
+    for bot_id, class_name in bot_class_map.items():
+        if class_name not in classes:
+            missing.append(class_name)
+        else:
+            bots[bot_id] = BotProxy(module_path=str(Path(file_path)), class_name=class_name)
+    if missing:
+        raise ValueError(f"Missing bot classes: {', '.join(sorted(set(missing)))}")
     return TeamController(team_id=team_id, bots=bots)
 
 

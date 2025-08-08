@@ -21,6 +21,7 @@ services:
       - botnet
 
   backend:
+    restart: always
     build:
       context: ./backend
     env_file:

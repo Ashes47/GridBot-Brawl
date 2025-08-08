@@ -6,43 +6,636 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
-    #grid { border: 1px solid #333; }
-    #controls { margin-top: 10px; }
-    #legend { margin-top: 15px; font-size: 20px; }
-    #layout { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:10px; }
-    #left-panel { width: 240px; max-height: 620px; overflow:auto; text-align:left; border:1px solid #ddd; padding:8px; border-radius:6px; background:#ffffffee; backdrop-filter: blur(2px); }
-    .tabs{ display:flex; gap:6px; margin-bottom:8px; }
-    .tab-btn{ flex:1; padding:6px 8px; font-size:12px; border:1px solid #e5e7eb; background:#f8fafc; border-radius:6px; cursor:pointer; }
-    .tab-btn.active{ background:#e0f2fe; border-color:#bae6fd; }
-    #bot-stats .row{ position:relative; display:grid; grid-template-columns: 1fr auto; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; margin-bottom:4px; background:#f8fafc; }
-    #bot-stats .row .bar{ position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg, #e2e8f0, #f8fafc); border-radius:6px; z-index:0; }
-    #bot-stats .name{ position:relative; z-index:1; max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; color:#0f172a; display:flex; align-items:center; gap:6px; }
-    #bot-stats .dot{ display:inline-block; width:10px; height:10px; border-radius:50%; }
-    #bot-stats .val{ position:relative; z-index:1; font-variant-numeric: tabular-nums; font-size:12px; color:#0f172a; }
-    #bot-stats .badge{ display:inline-block; margin-left:6px; padding:1px 6px; font-size:11px; border-radius:999px; background:#e2e8f0; color:#0f172a; }
-    #inspect { margin-top:0; font-size: 12px; }
-    #inspect pre{ max-height:240px; overflow:auto; background:#0b1020; color:#e2e8f0; border:1px solid #1f2937; padding:8px; border-radius:6px; }
-    #right-panel { width: 320px; max-height: 620px; overflow:auto; text-align:left; border:1px solid #ddd; padding:8px; border-radius:6px; }
-    #log { font-family: monospace; font-size: 13px; }
-    .log-turn { margin:6px 0; cursor: pointer; }
-    .log-turn { border:1px solid #e5e7eb; padding:6px 8px; border-radius:6px; background:#fafafa; }
-    .log-turn:hover { background:#f3f4f6; }
-    .highlight { box-shadow: 0 0 0 3px rgba(59,130,246,0.6) inset; }
-    #bot-info { font-size: 14px; margin-bottom:8px; }
-    #extra-controls button { margin: 0 4px; }
-    #toggles { margin-top:6px; font-size: 14px; }
-    #end-panel { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); }
-    #end-card { background:#fff; padding:18px 22px; border-radius:10px; min-width:320px; text-align:left; }
-    #toast { position:fixed; top:16px; right:16px; background:rgba(0,0,0,0.75); color:#fff; padding:8px 12px; border-radius:6px; display:none; }
-    #start-banner{ position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 16px; border-radius:8px; opacity:0; transition:opacity .4s ease; }
-    #tooltip{ position:fixed; pointer-events:none; background:rgba(0,0,0,0.75); color:#fff; padding:4px 6px; border-radius:4px; font-size:12px; display:none; }
+    body { 
+      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      text-align: center; 
+      margin: 0; 
+      padding: 24px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+    }
+    
+    h1 {
+      color: white;
+      text-shadow: 0 4px 8px rgba(0,0,0,0.4);
+      margin-bottom: 32px;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    
+    #grid { 
+      border: 3px solid #475569; 
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      background: #1e293b;
+    }
+    
+    #layout { 
+      display: flex; 
+      gap: 24px; 
+      justify-content: center; 
+      align-items: flex-start; 
+      margin-top: 24px; 
+      max-width: 1600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    /* Left Panel Styling */
+    #left-panel { 
+      width: 950px;
+      max-height: 800px;
+      overflow: hidden;
+      text-align: left;
+      border-radius: 22px;
+      background: rgba(30, 41, 59, 0.72);
+      box-shadow: 0 12px 48px 0 rgba(16, 24, 40, 0.45), 0 1.5px 0 0 #3b82f6 inset;
+      border: 1.5px solid rgba(59, 130, 246, 0.13);
+      backdrop-filter: blur(18px) saturate(1.2);
+      margin-top: 8px;
+      transition: box-shadow 0.2s, border 0.2s;
+    }
+    #left-panel:hover, #right-panel:hover {
+      box-shadow: 0 16px 64px 0 rgba(59, 130, 246, 0.18), 0 1.5px 0 0 #3b82f6 inset;
+      border: 1.5px solid rgba(59, 130, 246, 0.22);
+    }
+    .panel-header {
+      padding: 22px 32px 18px 32px;
+      background: linear-gradient(90deg, rgba(59,130,246,0.18) 0%, rgba(30,41,59,0.85) 100%);
+      color: #f1f5f9;
+      font-weight: 800;
+      border-radius: 22px 22px 0 0;
+      font-size: 1.25rem;
+      letter-spacing: 0.01em;
+      text-shadow: 0 2px 8px rgba(59,130,246,0.12);
+      border-bottom: 1.5px solid rgba(59,130,246,0.13);
+      box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+    }
+    .panel-content {
+      padding: 28px 32px 24px 32px;
+      max-height: calc(800px - 80px);
+      overflow-y: auto;
+      border: none;
+      background: transparent;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      background: rgba(30,41,59,0.7);
+      padding: 8px;
+      border-radius: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      border: 1.5px solid rgba(59,130,246,0.13);
+      box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 15px;
+      border: none;
+      background: transparent;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.18s;
+      font-weight: 700;
+      color: #a5b4fc;
+      letter-spacing: 0.01em;
+    }
+    .tab-btn.active {
+      background: linear-gradient(90deg, #3b82f6 0%, #1e293b 100%);
+      box-shadow: 0 4px 16px rgba(59,130,246,0.18);
+      color: #fff;
+      transform: translateY(-2px) scale(1.04);
+    }
+    .tab-btn:hover:not(.active) {
+      background: rgba(59,130,246,0.13);
+      color: #dbeafe;
+      transform: scale(1.03);
+    }
+    
+    #bot-stats .row { 
+      position: relative; 
+      display: grid; 
+      grid-template-columns: 1fr auto; 
+      align-items: center; 
+      gap: 16px; 
+      padding: 12px 16px; 
+      border-radius: 10px; 
+      margin-bottom: 8px; 
+      background: rgba(51, 65, 85, 0.4);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+    
+    #bot-stats .row:hover {
+      background: rgba(59, 130, 246, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    
+    #bot-stats .row .bar { 
+      position: absolute; 
+      left: 0; 
+      top: 0; 
+      bottom: 0; 
+      width: 0%; 
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.3), rgba(29, 78, 216, 0.3)); 
+      border-radius: 10px; 
+      z-index: 0;
+    }
+    
+    #bot-stats .name { 
+      position: relative; 
+      z-index: 1; 
+      max-width: 200px; 
+      white-space: nowrap; 
+      overflow: hidden; 
+      text-overflow: ellipsis; 
+      font-size: 14px; 
+      color: #e2e8f0; 
+      display: flex; 
+      align-items: center; 
+      gap: 10px;
+      font-weight: 600;
+    }
+    
+    #bot-stats .dot { 
+      display: inline-block; 
+      width: 14px; 
+      height: 14px; 
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    #bot-stats .val { 
+      position: relative; 
+      z-index: 1; 
+      font-variant-numeric: tabular-nums; 
+      font-size: 14px; 
+      color: #f1f5f9;
+      font-weight: 700;
+    }
+    
+    #bot-stats .badge { 
+      display: inline-block; 
+      margin-left: 10px; 
+      padding: 3px 8px; 
+      font-size: 11px; 
+      border-radius: 12px; 
+      background: linear-gradient(135deg, #f59e0b, #d97706); 
+      color: white;
+      font-weight: 700;
+      box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+    }
+    
+    #inspect { 
+      margin-top: 0; 
+      font-size: 13px; 
+    }
+
+    .inspect-toolbar{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin:10px 0 8px 0;
+    }
+    .mini-btn{
+      background: rgba(51, 65, 85, 0.8);
+      color: #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .mini-btn:hover{ 
+      background: rgba(59, 130, 246, 0.2); 
+      border-color: rgba(59, 130, 246, 0.5);
+      transform: translateY(-1px);
+    }
+    
+    #inspect pre { 
+      max-height: 360px; 
+      overflow: auto; 
+      background: #0f172a; 
+      color: #e2e8f0; 
+      border: 1px solid #334155; 
+      padding: 16px; 
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    /* Right Panel Styling */
+    #right-panel { 
+      width: 950px;
+      max-height: 800px;
+      overflow: hidden;
+      text-align: left;
+      border-radius: 22px;
+      background: rgba(30, 41, 59, 0.72);
+      box-shadow: 0 12px 48px 0 rgba(16, 24, 40, 0.45), 0 1.5px 0 0 #3b82f6 inset;
+      border: 1.5px solid rgba(59, 130, 246, 0.13);
+      backdrop-filter: blur(18px) saturate(1.2);
+      margin-top: 8px;
+      transition: box-shadow 0.2s, border 0.2s;
+    }
+    
+    #log { 
+      font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; 
+      font-size: 13px;
+      max-height: calc(750px - 200px);
+      overflow-y: auto;
+      padding-right: 12px;
+    }
+
+    .log-toolbar{
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 10px;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    .log-toolbar input[type="text"]{
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      border-radius: 8px;
+      font-size: 13px;
+      background: rgba(30, 41, 59, 0.8);
+      color: #e2e8f0;
+      transition: all 0.2s ease;
+    }
+    .log-toolbar input[type="text"]:focus{
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .chip{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(59, 130, 246, 0.1);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .chip:hover{
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.5);
+    }
+    
+    .log-turn { 
+      margin: 10px 0; 
+      cursor: pointer;
+      border: 1px solid rgba(71, 85, 105, 0.4); 
+      padding: 12px 16px; 
+      border-radius: 10px; 
+      background: rgba(51, 65, 85, 0.3);
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+    
+    .log-turn:hover { 
+      background: rgba(59, 130, 246, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    
+    .log-turn strong {
+      color: #93c5fd;
+      font-weight: 700;
+    }
+    
+    .log-turn ul {
+      margin: 8px 0 0 20px !important;
+      padding: 0 !important;
+    }
+    
+    .log-turn li {
+      color: #cbd5e1;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+    
+    .highlight { 
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.6) inset; 
+      background: rgba(59, 130, 246, 0.15) !important;
+    }
+    
+    #bot-info { 
+      font-size: 15px; 
+      margin-bottom: 16px;
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 10px;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    
+    /* Controls Styling */
+    .controls-container {
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      padding: 24px;
+      margin-top: 20px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    .control-group {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+    
+    .control-group label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    .speed-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .speed-btn:hover {
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    }
+    
+    .nav-btn {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+    
+    .nav-btn:hover {
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+    }
+    
+    .action-btn {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+    
+    .action-btn:hover {
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    }
+    
+    #slider {
+      flex: 1;
+      min-width: 200px;
+      margin: 0 16px;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(71, 85, 105, 0.5);
+      outline: none;
+      appearance: none;
+    }
+    
+    #slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    
+    select {
+      padding: 8px 12px;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      border-radius: 8px;
+      background: rgba(30, 41, 59, 0.8);
+      font-size: 13px;
+      color: #e2e8f0;
+    }
+    
+    input[type="checkbox"] {
+      margin-right: 8px;
+      accent-color: #3b82f6;
+    }
+    
+    /* Legend Styling */
+    .legend-container {
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      margin-top: 20px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      overflow: hidden;
+    }
+    
+    .legend-header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .legend-toggle {
+      font-size: 20px;
+      transition: transform 0.3s ease;
+    }
+    
+    .legend-toggle.collapsed {
+      transform: rotate(-90deg);
+    }
+    
+    .legend-content {
+      padding: 20px;
+      font-size: 15px;
+      line-height: 1.6;
+      transition: all 0.3s ease;
+      max-height: 250px;
+      overflow: hidden;
+    }
+    
+    .legend-content.collapsed {
+      max-height: 0;
+      padding: 0 20px;
+    }
+    
+    .legend-item {
+      display: inline-block;
+      margin-right: 24px;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: rgba(51, 65, 85, 0.4);
+      border-radius: 8px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+    
+    /* Modal Styling */
+    #end-panel { 
+      position: fixed; 
+      inset: 0; 
+      display: none; 
+      align-items: center; 
+      justify-content: center; 
+      background: rgba(0,0,0,0.7); 
+      backdrop-filter: blur(8px);
+    }
+    
+    #end-card { 
+      background: rgba(30, 41, 59, 0.98); 
+      padding: 32px 36px; 
+      border-radius: 20px; 
+      min-width: 450px; 
+      text-align: left;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      color: #e2e8f0;
+    }
+    
+    #toast { 
+      position: fixed; 
+      top: 24px; 
+      right: 24px; 
+      background: rgba(15, 23, 42, 0.95); 
+      color: white; 
+      padding: 16px 20px; 
+      border-radius: 12px; 
+      display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      font-weight: 600;
+    }
+    
+    #start-banner { 
+      position: fixed; 
+      top: 32px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      background: rgba(15, 23, 42, 0.95); 
+      color: white; 
+      padding: 16px 24px; 
+      border-radius: 12px; 
+      opacity: 0; 
+      transition: opacity 0.4s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      font-weight: 700;
+      font-size: 18px;
+    }
+    
+    #tooltip { 
+      position: fixed; 
+      pointer-events: none; 
+      background: rgba(15, 23, 42, 0.95); 
+      color: white; 
+      padding: 8px 12px; 
+      border-radius: 8px; 
+      font-size: 13px; 
+      display: none;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      font-weight: 600;
+    }
+    
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: rgba(51, 65, 85, 0.3);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.5);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.7);
+    }
+
+    /* Additional polish */
+    .panel-content label {
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+
+    .panel-content select {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      color: #e2e8f0;
+    }
+
+    #info {
+      margin-top: 16px;
+      font-weight: 600;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
   <header class="site-header">
     <div class="nav">
-      <a class="brand" href="index.html">�� GridBot Brawl</a>
+      <a class="brand" href="index.html">🤖 GridBot Brawl</a>
       <nav class="links">
         <a href="leaderboard.html?mode=duo">Leaderboards</a>
         <a href="teams.html">Teams</a>
@@ -54,65 +647,99 @@
   <h1>Match Viewer</h1>
   <div id="layout">
     <div id="left-panel">
-      <div style="font-weight:bold; margin-bottom:6px;">Bot Stats</div>
-      <div class="tabs">
-        <button class="tab-btn active" data-tab="stats">Stats</button>
-        <button class="tab-btn" data-tab="inspect">Inspect</button>
-      </div>
-      <div id="tab-stats">
-        <div id="bot-stats"></div>
-        <label style="display:block; margin-top:8px;"><input type="checkbox" id="pinSelected"> Pin selected bot on top</label>
-      </div>
-      <div id="tab-inspect" style="display:none;">
-        <div id="inspect">
-          <div style="font-weight:bold; margin:6px 0;">Inspect Observation</div>
-          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span>Bot:</span>
-            <select id="inspect-bot"></select>
-            <span style="color:#64748b;">Follows current turn</span>
+      <div class="panel-header">Bot Stats</div>
+      <div class="panel-content">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="stats">Stats</button>
+          <button class="tab-btn" data-tab="inspect">Inspect</button>
+        </div>
+        <div id="tab-stats">
+          <div id="bot-stats"></div>
+          <label style="display:block; margin-top:16px; font-size:13px;">
+            <input type="checkbox" id="pinSelected"> Pin selected bot on top
+          </label>
+        </div>
+        <div id="tab-inspect" style="display:none;">
+          <div id="inspect">
+            <div style="font-weight:700; margin:12px 0; color:#e2e8f0; font-size:15px;">Inspect Observation</div>
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+              <span style="font-size:13px; font-weight:600; color:#cbd5e1;">Bot:</span>
+              <select id="inspect-bot" style="min-width:200px;"></select>
+              <span style="color:#94a3b8; font-size:12px;">Follows current turn</span>
+            </div>
+            <div class="inspect-toolbar">
+              <button id="btn-copy-obs" class="mini-btn">Copy</button>
+              <button id="btn-wrap-obs" class="mini-btn" data-wrapped="0">Wrap</button>
+              <button id="btn-expand-obs" class="mini-btn">Expand</button>
+            </div>
+            <pre id="inspect-output"></pre>
           </div>
-          <pre id="inspect-output"></pre>
         </div>
       </div>
     </div>
+    
     <div>
       <canvas id="grid" width="600" height="600"></canvas>
-      <div id="info"></div>
-      <div id="controls">
-        <button id="play">Play</button>
-        <button id="pause">Pause</button>
-        <button id="speed1">⏪ 1x</button>
-        <button id="speed2">⏩ 2x</button>
-        <button id="speed4">⚡ 4x</button>
-        <input type="range" id="slider" min="0" value="0" style="width:60%;">
+      <div id="info" style="margin-top:16px; font-weight:600; color:white; text-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>
+      
+      <div class="controls-container">
+        <div class="control-group">
+          <button id="play">▶️ Play</button>
+          <button id="pause">⏸️ Pause</button>
+          <button id="speed1" class="speed-btn">1x</button>
+          <button id="speed2" class="speed-btn">2x</button>
+          <button id="speed4" class="speed-btn">4x</button>
+          <input type="range" id="slider" min="0" value="0">
+        </div>
+        
+        <div class="control-group">
+          <button id="back5" class="nav-btn">⏮ -5</button>
+          <button id="back1" class="nav-btn">◀ -1</button>
+          <button id="fwd1" class="nav-btn">+1 ▶</button>
+          <button id="fwd5" class="nav-btn">+5 ⏭</button>
+          <button id="prevEvent" class="action-btn">Prev Event</button>
+          <button id="nextEvent" class="action-btn">Next Event</button>
+        </div>
+        
+        <div class="control-group">
+          <button id="reverse" class="action-btn">🔄 Reverse</button>
+          <button id="snapshot" class="action-btn">📷 Copy Link</button>
+          <label>Team View: 
+            <select id="team-view">
+              <option value="">Global</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="sfxToggle"> 🔊 SFX</label>
+        </div>
       </div>
-      <div id="extra-controls" style="margin-top:6px;">
-        <button id="back1">◀︎ -1</button>
-        <button id="back5">⏮ -5</button>
-        <button id="fwd1">+1 ▶︎</button>
-        <button id="fwd5">+5 ⏭</button>
-        <button id="prevEvent">Prev Event</button>
-        <button id="nextEvent">Next Event</button>
-        <button id="reverse">Reverse ⤿</button>
-        <button id="snapshot">Copy Snapshot Link</button>
-        <label style="margin-left:8px;">Team View: 
-          <select id="team-view">
-            <option value="">Global</option>
-          </select>
-        </label>
-        <label style="margin-left:8px;"><input type="checkbox" id="sfxToggle"> SFX</label>
+      
+      <div class="legend-container">
+        <div class="legend-header" onclick="toggleLegend()">
+          <span>Bot Types Legend</span>
+          <span class="legend-toggle collapsed">▶</span>
+        </div>
+        <div class="legend-content collapsed" id="legend-content">
+          <div id="legend"></div>
+        </div>
       </div>
-      <div id="legend"></div>
     </div>
+    
     <div id="right-panel">
-      <div id="bot-info"><strong>Click a bot to highlight and view stats.</strong></div>
-      <div id="log"></div>
+      <div class="panel-header">Match Log</div>
+      <div class="panel-content">
+        <div id="bot-info"><strong>Click a bot to highlight and view stats.</strong></div>
+        <div class="log-toolbar">
+          <input type="text" id="log-search" placeholder="Search log... (e.g., Sniper, moved, ☠️)">
+          <label class="chip"><input type="checkbox" id="log-only-events"> Only events</label>
+        </div>
+        <div id="log"></div>
+      </div>
     </div>
   </div>
   <div id="end-panel"><div id="end-card">
-    <h3 id="end-title" style="margin-top:0;">Match Finished</h3>
+    <h3 id="end-title" style="margin-top:0; color:#e2e8f0;">Match Finished</h3>
     <div id="end-body"></div>
-    <div style="text-align:right; margin-top:10px;"><button id="close-end">Close</button></div>
+    <div style="text-align:right; margin-top:16px;"><button id="close-end">Close</button></div>
   </div></div>
   <div id="toast"></div>
   <div id="start-banner"></div>
@@ -123,7 +750,7 @@
     const matchId = params.get('id');
     const startTurnParam = parseInt(params.get('turn') || '0', 10);
     if (!matchId) {
-      document.getElementById('info').textContent = 'Missing ?id= parameter in URL';
+      document.getElementById('info').innerHTML = '<span style="background:rgba(239,68,68,0.9); color:#fff; padding:6px 12px; border-radius:6px; font-weight:600;">❌ Missing ?id= parameter in URL</span>';
       throw new Error('match id required');
     }
 
@@ -154,7 +781,52 @@
     let particles = []; // {x,y,vx,vy,life}
     let playEventsOnly = false;
     let visibleCells = null; // for fog-of-war
+    let lastMouse = null;
     let summaryDamageByBot = {};
+
+    // Global tooltip helper for canvas hover (used by event handlers)
+    function maybeShowTooltip(){
+      const tooltipEl = document.getElementById('tooltip');
+      const frame = frames[tick];
+      if (!frame) { tooltipEl.style.display='none'; return; }
+      const rect = GRID_CANVAS.getBoundingClientRect();
+      const mouse = lastMouse || null;
+      if (!mouse) { tooltipEl.style.display='none'; return; }
+      const mx = mouse.x - rect.left, my = mouse.y - rect.top;
+      const px = cellPixels();
+      // compute visibility if team view is selected
+      let visibleSet = null;
+      if (selectedTeamPrefix){
+        visibleSet = new Set();
+        const allyPos = [];
+        for (const [bid,pos] of Object.entries(frame.positions)){
+          if (bid.startsWith(selectedTeamPrefix+"-")) { visibleSet.add(bid); allyPos.push(pos); }
+        }
+        const cheb = (a,b)=> Math.max(Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1]));
+        for (const [bid,pos] of Object.entries(frame.positions)){
+          if (!bid.startsWith(selectedTeamPrefix+"-")){
+            for (const ap of allyPos){ if (cheb(ap,pos) <= 3){ visibleSet.add(bid); break; } }
+          }
+        }
+      }
+      // find nearest bot circle under cursor
+      let hoveredBid = null;
+      for (const [id,pos] of Object.entries(frame.positions)){
+        if (visibleSet && !visibleSet.has(id)) continue;
+        const dx = (pos[0]+0.5)*px - mx; const dy=(pos[1]+0.5)*px - my;
+        if (Math.sqrt(dx*dx+dy*dy) < px/3){ hoveredBid = id; break; }
+      }
+      if (hoveredBid){
+        const role = hoveredBid.split('-')[1];
+        const meta = META_BY_CODE[role] || {};
+        tooltipEl.textContent = `${meta.emoji||'?'} ${meta.name||role} — CD ${meta.cooldown ?? '-'}`;
+        tooltipEl.style.left = (mouse.x+10)+'px';
+        tooltipEl.style.top = (mouse.y+10)+'px';
+        tooltipEl.style.display = 'block';
+      } else {
+        tooltipEl.style.display = 'none';
+      }
+    }
     function computeLiveDamage(uptoTick){
       const dmg = {};
       const len = Math.min(uptoTick, frames.length-1);
@@ -283,24 +955,50 @@
       return {dmg, kills};
     }
 
-    const ROLE_ICON = { sn: '🎯', ta: '🛡️', bo: '💣', sc: '🏃', te: '✨' };
-    const ROLE_COLOR = { sn: '#e74c3c', ta: '#3498db', sc: '#2ecc71', bo: '#f59e0b', te: '#9b59b6' };
+    let META_BY_CODE = {};
+    async function loadComponentMeta(){
+      try{
+        const res = await fetch('http://localhost:8000/metadata/components');
+        const data = await res.json();
+        const comps = data.components || [];
+        META_BY_CODE = Object.fromEntries(comps.map(c=>[c.code, c]));
+      }catch(e){ META_BY_CODE = {}; }
+    }
 
     function friendlyName(botId){
-      // botId format: <teamPrefix>-<roleCode>
       const [prefix, role] = botId.split('-');
       const team = teamsMeta.find(t=>t.prefix===prefix);
       const teamName = team? team.name : prefix;
-      const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role] || role;
+      const roleName = META_BY_CODE[role]?.name || role;
       return `${teamName} ${roleName}`;
     }
     function easeInOut(t){ return t<0.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
     function lerp(a,b,t){ return a + (b-a)*t; }
 
-    // build legend
+    // build legend (after meta)
     const legendDiv = document.getElementById('legend');
-    legendDiv.innerHTML = Object.entries({sn:'Sniper',ta:'Tank',bo:'Bomber',sc:'Scout',te:'Teleporter'})
-      .map(([code,label])=>`<span style="margin-right:15px;">${ROLE_ICON[code]} – ${label}</span>`).join('');
+    async function renderLegend(){
+      if (!META_BY_CODE || Object.keys(META_BY_CODE).length===0) await loadComponentMeta();
+      legendDiv.innerHTML = Object.values(META_BY_CODE)
+        .map(c=>`<span class="legend-item">${c.emoji} – ${c.name}</span>`).join('');
+    }
+    renderLegend();
+
+    // Legend toggle functionality
+    function toggleLegend() {
+      const content = document.getElementById('legend-content');
+      const toggle = document.querySelector('.legend-toggle');
+      
+      if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        toggle.classList.remove('collapsed');
+        toggle.textContent = '▼';
+      } else {
+        content.classList.add('collapsed');
+        toggle.classList.add('collapsed');
+        toggle.textContent = '▶';
+      }
+    }
 
     document.getElementById('play').onclick = () => { playing = true; animStart = performance.now(); if(!rafId) rafId=requestAnimationFrame(step); };
     document.getElementById('pause').onclick = () => { playing = false; };
@@ -329,9 +1027,15 @@
     };
     // Play events only
     const btnPlayEvents = document.createElement('button');
-    btnPlayEvents.textContent = 'Play Events';
-    document.getElementById('extra-controls').appendChild(btnPlayEvents);
+    btnPlayEvents.textContent = '⚡ Play Events';
+    btnPlayEvents.className = 'action-btn';
     btnPlayEvents.onclick = ()=>{ playEventsOnly = true; playing=true; animStart=performance.now(); if(!rafId) rafId=requestAnimationFrame(step); };
+    
+    // Find the second control group and append the button
+    const controlGroups = document.querySelectorAll('.control-group');
+    if (controlGroups[1]) {
+      controlGroups[1].appendChild(btnPlayEvents);
+    }
     document.getElementById('reverse').onclick = ()=>{ reverseMode = !reverseMode; };
     document.getElementById('snapshot').onclick = ()=>{
       const url = `${location.origin}${location.pathname}?id=${encodeURIComponent(matchId)}&turn=${tick}`;
@@ -472,6 +1176,31 @@
           ctx.stroke();
         }
       }
+      // hover tooltip
+      const tooltipEl = document.getElementById('tooltip');
+      function maybeShowTooltip(){
+        const {left,top} = GRID_CANVAS.getBoundingClientRect();
+        const mouse = lastMouse || null;
+        if (!mouse) { tooltipEl.style.display='none'; return; }
+        const mx = mouse.x - left, my = mouse.y - top;
+        const pxSize = cellPixels();
+        const gx = Math.floor(mx/pxSize), gy = Math.floor(my/pxSize);
+        // find nearest bot circle under cursor
+        let bid = null;
+        for (const [id, pos] of Object.entries(frame.positions)){
+          if (visibleSet && !visibleSet.has(id)) continue;
+          const dx = (pos[0]+0.5)*px - mx; const dy=(pos[1]+0.5)*px - my;
+          if (Math.sqrt(dx*dx+dy*dy) < px/3){ bid = id; break; }
+        }
+        if (bid){
+          const role = bid.split('-')[1]; const meta = META_BY_CODE[role]||{};
+          tooltipEl.textContent = `${meta.emoji||'?'} ${meta.name||role} — CD ${meta.cooldown ?? '-'}`;
+          tooltipEl.style.left = (mouse.x+10)+'px'; tooltipEl.style.top=(mouse.y+10)+'px'; tooltipEl.style.display='block';
+        } else {
+          tooltipEl.style.display='none';
+        }
+      }
+
       for (const [botId, pos] of Object.entries(frame.positions)) {
         if (visibleSet && !visibleSet.has(botId)) continue;
         const [cx, cy] = pos;
@@ -484,9 +1213,9 @@
         ctx.beginPath();
         ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3, 0, Math.PI * 2);
         ctx.fill();
-        // shield glow
-        const shieldTurns = frame.shields?.[botId] ?? 0;
-        if (shieldTurns > 0) {
+        // shield glow (based on shield pool > 0)
+        const shieldPool = frame.shields?.[botId] ?? 0;
+        if (shieldPool > 0) {
           const pulse = cinematic ? (0.6 + 0.4*Math.sin(now/150)) : 0.9;
           ctx.strokeStyle = `rgba(59,130,246,${pulse})`;
           ctx.lineWidth = 4;
@@ -527,8 +1256,9 @@
         ctx.font = `${px/2}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = ROLE_COLOR[roleCode] || '#000';
-        ctx.fillText(ROLE_ICON[roleCode] || '?', (x+0.5)*px, (y+0.5)*px);
+        const meta = META_BY_CODE[roleCode];
+        ctx.fillStyle = meta?.color || '#000';
+        ctx.fillText(meta?.emoji || '?', (x+0.5)*px, (y+0.5)*px);
       }
       lastHP = frame.hp;
 
@@ -544,6 +1274,38 @@
           }
         }
       }
+
+      // draw structures under action overlays
+      const drawStructures = ()=>{
+        const px=cellPixels();
+        const s = frame.structures || {};
+        const tNow = performance.now();
+        // walls: subtle pulse
+        (s.walls||[]).forEach(([x,y,team])=>{
+          const pulse = 0.85 + 0.1*Math.sin(tNow/400 + (x+y));
+          ctx.fillStyle = `rgba(100,116,139,${pulse})`;
+          ctx.fillRect(x*px+2, y*px+2, px-4, px-4);
+          // small brick icon
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.fillRect(x*px+px*0.25, y*px+px*0.45, px*0.5, 2);
+        });
+        // decoys: bobbing opacity
+        (s.decoys||[]).forEach(([x,y,team])=>{
+          const alpha = 0.65 + 0.25*Math.sin(tNow/300 + x*0.3 + y*0.2);
+          ctx.fillStyle = `rgba(245,245,220,${alpha})`;
+          ctx.beginPath(); ctx.arc((x+0.5)*px, (y+0.5)*px, px/4, 0, Math.PI*2); ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.font=`${px*0.35}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('🐾', (x+0.5)*px, (y+0.5)*px);
+        });
+        // traps: subtle blinking border and icon
+        (s.traps||[]).forEach(([x,y,team])=>{
+          const blink = 0.4 + 0.4*Math.max(0, Math.sin(tNow/250 + (x-y)));
+          ctx.strokeStyle=`rgba(249,115,22,${blink})`;
+          ctx.lineWidth=2; ctx.strokeRect(x*px+6, y*px+6, px-12, px-12);
+          ctx.font = `${px*0.35}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='rgba(249,115,22,0.6)'; ctx.fillText('🪤', (x+0.5)*px, (y+0.5)*px);
+        });
+      };
+      drawStructures();
+      maybeShowTooltip();
 
       // action visuals (only for visible actors when team view is on)
       if(frame.actions){
@@ -569,8 +1331,9 @@
             ctx.font = `${px}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = ROLE_COLOR[roleCode] || '#000';
-            ctx.fillText(ROLE_ICON[roleCode] || '?', sx, sy);
+            const metaAct = META_BY_CODE[roleCode] || {};
+            ctx.fillStyle = metaAct.color || '#000';
+            ctx.fillText(metaAct.emoji || '?', sx, sy);
             ctx.restore();
           }
           if(act.type==='attack'){
@@ -646,7 +1409,7 @@
       const frame = frames[tick];
       if (frame) {
         drawBots(frame);
-        document.getElementById('info').textContent = `Turn ${frame.turn+1}/${frames.length}`;
+        document.getElementById('info').innerHTML = `<span style="background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px;">Turn ${frame.turn+1}/${frames.length}</span>`;
         document.getElementById('slider').value=tick;
         // update bot info panel if selected
         if (selectedBotId) {
@@ -697,13 +1460,15 @@
           const nextTick = (tick + (reverseMode? -1: 1) + frames.length) % frames.length;
           // spawn damage texts based on HP delta
           const nextFrame = frames[nextTick];
-          for (const bid in nextFrame.hp){
-            const prevHP = prevFrame.hp?.[bid] ?? nextFrame.hp[bid];
-            const currHP = nextFrame.hp[bid];
-            const delta = prevHP - currHP;
-            if (delta > 0){
-              const pos = nextFrame.positions[bid];
-              if (pos){ damageTexts.push({x:pos[0], y:pos[1], text:`-${delta}`, dur:450, end: performance.now()+450}); }
+          if (nextFrame && nextFrame.hp){
+            for (const bid in nextFrame.hp){
+              const prevHP = prevFrame.hp?.[bid] ?? nextFrame.hp[bid];
+              const currHP = nextFrame.hp[bid];
+              const delta = prevHP - currHP;
+              if (delta > 0){
+                const pos = nextFrame.positions[bid];
+                if (pos){ damageTexts.push({x:pos[0], y:pos[1], text:`-${delta}`, dur:450, end: performance.now()+450}); }
+              }
             }
           }
           tick = nextTick;
@@ -711,7 +1476,8 @@
           if (playEventsOnly){
             let i = tick; let found = false;
             while (i < frames.length){
-              const ev = frames[i].events||[];
+              const f = frames[i];
+              const ev = (f && f.events) ? f.events : [];
               if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { found=true; break; }
               i++;
             }
@@ -723,11 +1489,18 @@
             playing = false; showEndPanel();
           }
           // show elimination toast
-          const ev = frames[tick].events||[];
+          const f2 = frames[tick];
+          const ev = (f2 && f2.events) ? f2.events : [];
           const kill = ev.find(s=>s.startsWith('☠️'));
           if (kill){
             const toast=document.getElementById('toast');
-            toast.textContent = kill;
+            // Replace bot IDs with friendly names in the kill message
+            let friendlyKillText = kill.replace(/\b([0-9a-f]{6})-(sn|ta|bo|sc|te)\b/gi, (m, pfx, role)=>{
+              const tm = teamsMeta.find(t=>t.prefix===pfx);
+              const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role]||role;
+              return `${tm?tm.name:pfx} ${roleName}`;
+            });
+            toast.textContent = friendlyKillText;
             toast.style.display='block';
             setTimeout(()=>{ toast.style.display='none'; }, 1200);
           }
@@ -736,7 +1509,9 @@
       rafId = requestAnimationFrame(step);
     }
 
-    function buildLog() {
+    function buildLog(filters={}) {
+      const searchTerm = (filters.query||'').toLowerCase().trim();
+      const onlyEvents = !!filters.onlyEvents;
       const logDiv = document.getElementById('log');
       const frag = document.createDocumentFragment();
       frames.forEach((f, idx) => {
@@ -746,23 +1521,29 @@
         title.innerHTML = `<strong>Turn ${idx+1}</strong>`;
         container.appendChild(title);
         const evs = f.events || [];
-        if (evs.length > 0) {
+        const list = onlyEvents ? evs : (evs.length ? evs : []);
+        if (list.length > 0) {
           const ul = document.createElement('ul');
           ul.style.margin = '4px 0 8px 16px';
           ul.style.padding = '0';
-          evs.forEach(e => {
-            // replace raw ids with friendly names if present
+          list.forEach(e => {
             let text = e.replace(/\b([0-9a-f]{6})-(sn|ta|bo|sc|te)\b/gi, (m, pfx, role)=>{
               const tm = teamsMeta.find(t=>t.prefix===pfx);
               const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role]||role;
               return `${tm?tm.name:pfx} ${roleName}`;
             });
+            if (searchTerm && !text.toLowerCase().includes(searchTerm)) return;
             const li = document.createElement('li'); li.textContent = text; ul.appendChild(li);
           });
-          container.appendChild(ul);
+          if (ul.children.length>0) container.appendChild(ul);
+        } else if (!onlyEvents && !searchTerm) {
+          const span = document.createElement('div'); span.style.color='#64748b'; span.textContent = 'No notable events'; container.appendChild(span);
         }
-        container.onclick = () => { playing=false; clearTimeout(timer); tick = idx; render(); };
-        frag.appendChild(container);
+        // hide container if no items after filtering
+        if (container.children.length>1) {
+          container.onclick = () => { playing=false; clearTimeout(timer); tick = idx; render(); };
+          frag.appendChild(container);
+        }
       });
       logDiv.innerHTML='';
       logDiv.appendChild(frag);
@@ -796,19 +1577,11 @@
       }
     });
     GRID_CANVAS.addEventListener('mousemove', (e)=>{
-      const bid = nearestBotIdAtCanvas(e.clientX, e.clientY);
-      const t = document.getElementById('tooltip');
-      if (bid){
-        const rect = GRID_CANVAS.getBoundingClientRect();
-        t.style.left = (e.clientX+10) + 'px';
-        t.style.top = (e.clientY+10) + 'px';
-        const frame = frames[tick];
-        const hp = frame.hp?.[bid] ?? '-';
-        t.textContent = `${friendlyName(bid)} | HP ${hp}`;
-        t.style.display = 'block';
-      } else {
-        t.style.display = 'none';
-      }
+      lastMouse = {x: e.clientX, y: e.clientY};
+      maybeShowTooltip();
+    });
+    GRID_CANVAS.addEventListener('mouseout', ()=>{
+      document.getElementById('tooltip').style.display = 'none';
     });
 
     function renderBotStats(){
@@ -851,7 +1624,7 @@
         const meta = await metaRes.json();
         metaInfo = meta;
         if (meta.status !== 'finished') {
-          document.getElementById('info').textContent = `Match still ${meta.status}. Refresh later.`;
+          document.getElementById('info').innerHTML = `<span style="background:rgba(255,193,7,0.9); color:#000; padding:6px 12px; border-radius:6px; font-weight:600;">⏳ Match still ${meta.status}. Refresh later.</span>`;
           return;
         }
         gridSize = meta.mode === 'duo' ? 10 : 15;
@@ -877,6 +1650,23 @@
         };
         // build action log
         buildLog();
+        // wire log filters
+        const logSearch = document.getElementById('log-search');
+        const logOnlyEvents = document.getElementById('log-only-events');
+        if (logSearch && logOnlyEvents){
+          const applyFilters = ()=> buildLog({ query: logSearch.value, onlyEvents: logOnlyEvents.checked });
+          logSearch.addEventListener('input', applyFilters);
+          logOnlyEvents.addEventListener('change', applyFilters);
+        }
+        // wire inspect toolbar
+        const preObs = document.getElementById('inspect-output');
+        const btnCopy = document.getElementById('btn-copy-obs');
+        const btnWrap = document.getElementById('btn-wrap-obs');
+        const btnExpand = document.getElementById('btn-expand-obs');
+        if (btnCopy){ btnCopy.onclick = ()=>{ navigator.clipboard.writeText(preObs.textContent||''); btnCopy.textContent='Copied'; setTimeout(()=>btnCopy.textContent='Copy',800); } }
+        if (btnWrap){ btnWrap.onclick = ()=>{ const wrapped = btnWrap.getAttribute('data-wrapped')==='1'; preObs.style.whiteSpace = wrapped ? 'pre' : 'pre-wrap'; btnWrap.setAttribute('data-wrapped', wrapped? '0':'1'); btnWrap.textContent = wrapped? 'Wrap':'Unwrap'; } }
+        if (btnExpand){ btnExpand.onclick = ()=>{ const isExpanded = preObs.style.maxHeight === 'none'; preObs.style.maxHeight = isExpanded ? '' : 'none'; btnExpand.textContent = isExpanded ? 'Expand' : 'Collapse'; } }
+        
         // start turn from URL if provided
         if (!Number.isNaN(startTurnParam) && startTurnParam >=0 && startTurnParam < frames.length) {
           tick = startTurnParam;
@@ -887,7 +1677,7 @@
         if (selectedBotId) { botSel.value = selectedBotId; }
         updateInspector();
         drawGrid();
-        document.getElementById('info').textContent = 'Loaded. Press Play.';
+        document.getElementById('info').innerHTML = '<span style="background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px;">✅ Loaded. Press Play.</span>';
         // kick off RAF
         if (!rafId) rafId=requestAnimationFrame(step);
         // start banner

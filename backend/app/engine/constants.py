@@ -23,21 +23,56 @@ class Direction(str, Enum):
             Direction.WEST: (-1, 0),
         }[self]
 
-# Bot roles
+# Bot roles (expanded)
 class Role(str, Enum):
+    # Damage
     SNIPER = "sniper"
-    TANK = "tank"
     BOMBER = "bomber"
+    BRUISER = "bruiser"
+    POISONER = "poisoner"
+    # Defense
+    TANK = "tank"
+    SHIELD_GIVER = "shield_giver"
+    REFLECTOR = "reflector"
+    # Support
+    HEALER = "healer"
+    PULLER = "puller"
+    SILENCER = "silencer"
+    # Mobility
     SCOUT = "scout"
     TELEPORTER = "teleporter"
+    LEAPER = "leaper"
+    # Control / Utility / Disruptor
+    TRAP_SETTER = "trap_setter"
+    PUSHER = "pusher"
+    JAMMER = "jammer"
+    WALL_BUILDER = "wall_builder"
+    DECOY_CASTER = "decoy_caster"
 
-# Power cooldowns
+# Power cooldowns (canonical v1.0)
 COOLDOWNS: Dict[Role, int] = {
     Role.SNIPER: 3,
-    Role.TANK: 5,
-    Role.BOMBER: 4,
+    Role.BOMBER: 3,
+    Role.BRUISER: 0,  # passive
+    Role.POISONER: 3,
+
+    Role.TANK: 3,
+    Role.SHIELD_GIVER: 2,
+    Role.REFLECTOR: 4,
+
+    Role.HEALER: 3,
+    Role.PULLER: 3,
+    Role.SILENCER: 3,
+
     Role.SCOUT: 2,
-    Role.TELEPORTER: 5,
+    Role.TELEPORTER: 4,
+    Role.LEAPER: 2,
+
+    Role.TRAP_SETTER: 3,
+    Role.PUSHER: 2,
+    Role.JAMMER: 3,
+    Role.WALL_BUILDER: 3,
+    Role.DECOY_CASTER: 4,
 }
 
 MAX_HP = 100

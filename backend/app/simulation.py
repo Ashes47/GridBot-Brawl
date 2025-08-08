@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -22,11 +22,36 @@ from .engine import (
     TURN_LIMIT,
 )
 
+def safe_position_from_dict(target_dict: dict, grid_size: int) -> "Position":
+    """
+    Safely create a Position from a dictionary, ensuring coordinates are within valid bounds.
+    Clamps coordinates to valid range if they're outside bounds.
+    Returns a Position with clamped coordinates.
+    """
+    if not isinstance(target_dict, dict) or "x" not in target_dict or "y" not in target_dict:
+        # Return center position as fallback for invalid input
+        return Position(x=grid_size // 2, y=grid_size // 2)
+
+    try:
+        x = int(target_dict["x"])
+        y = int(target_dict["y"])
+
+        # Clamp coordinates to valid bounds (0 <= x,y < grid_size)
+        x = max(0, min(x, grid_size - 1))
+        y = max(0, min(y, grid_size - 1))
+
+        return Position(x=x, y=y)
+    except (ValueError, TypeError, KeyError):
+        # Return center position as fallback for invalid input
+        return Position(x=grid_size // 2, y=grid_size // 2)
+
+
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data/matches"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-ROLE_ORDER = [Role.SNIPER, Role.TANK, Role.BOMBER, Role.SCOUT, Role.TELEPORTER]
+# default order fallback if roster missing
+DEFAULT_ROLE_ORDER = [Role.SNIPER, Role.TANK, Role.BOMBER, Role.SCOUT, Role.TELEPORTER]
 
 
 async def _load_teams(session: AsyncSession, team_ids: List[str]):
@@ -66,10 +91,10 @@ from .sandbox import load_team, safe_decide
 
 
 class _SandboxManager:
-    def __init__(self, team_files: Dict[str, str], team_bots_map: Dict[str, List[str]]):
-        """team_files maps team_id -> bot file path; team_bots_map maps team_id -> list of bot_ids."""
+    def __init__(self, team_files: Dict[str, str], bot_class_map: Dict[str, Dict[str, str]]):
+        """team_files maps team_id -> bot file path; bot_class_map maps team_id -> {bot_id: class_name}."""
         self.controllers = {
-            tid: load_team(tid, path, team_bots_map[tid])
+            tid: load_team(tid, path, bot_class_map[tid])
             for tid, path in team_files.items()
         }
         # last_observations maps bot_id -> obs for the most recent decide cycle
@@ -103,6 +128,13 @@ class _SandboxManager:
                     else:
                         vis_enemies.append(entry)
 
+            # Visible structures within radius 4
+            def within4(x, y):
+                return max(abs(x - bot.position.x), abs(y - bot.position.y)) <= 4
+            visible_walls = [[w.x, w.y] for w in state.walls if within4(w.x, w.y)]
+            visible_decoys = [[d.x, d.y, d.team_id] for d in state.decoys if within4(d.x, d.y)]
+            visible_traps = [[t.x, t.y, t.team_id] for t in state.traps if t.team_id == bot.team_id and within4(t.x, t.y)]
+
             obs = {
                 "turn": state.turn,
                 "map_size": [state.grid_size, state.grid_size],
@@ -116,6 +148,9 @@ class _SandboxManager:
                 },
                 "visible_enemies": vis_enemies,
                 "visible_allies": vis_allies,
+                "visible_walls": visible_walls,
+                "visible_decoys": visible_decoys,
+                "visible_traps": visible_traps,
             }
             obs_map[bot.id] = obs
             action_dict = safe_decide(proxy, obs)
@@ -128,6 +163,18 @@ class _SandboxManager:
                 SnipeAction,
                 ExplodeAction,
                 BlinkAction,
+                ProjectShieldAction,
+                HealAction,
+                InfectAction,
+                SilenceAction,
+                MirrorAction,
+                DropTrapAction,
+                DropWallAction,
+                CloneAction,
+                YankAction,
+                ShoveAction,
+                LeapAction,
+                ScrambleAction,
             )
 
             t = action_dict.get("type")
@@ -140,11 +187,37 @@ class _SandboxManager:
             elif t == "shield":
                 actions[bot.id] = ShieldAction()
             elif t == "snipe" and "target" in action_dict:
-                actions[bot.id] = SnipeAction(target=Position(**action_dict["target"]))
+                actions[bot.id] = SnipeAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
             elif t == "explode":
                 actions[bot.id] = ExplodeAction()
             elif t == "blink":
                 actions[bot.id] = BlinkAction()
+            elif t == "project_shield" and "target" in action_dict:
+                actions[bot.id] = ProjectShieldAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "heal" and "target" in action_dict:
+                actions[bot.id] = HealAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "infect" and "target" in action_dict:
+                actions[bot.id] = InfectAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "silence" and "target" in action_dict:
+                actions[bot.id] = SilenceAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "mirror":
+                actions[bot.id] = MirrorAction()
+            elif t == "drop_trap":
+                actions[bot.id] = DropTrapAction()
+            elif t == "drop_wall" and "target" in action_dict:
+                actions[bot.id] = DropWallAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "clone":
+                # optional target; if provided, parse, else leave None and engine will treat as no-op
+                pos = action_dict.get("target")
+                actions[bot.id] = CloneAction(target=(safe_position_from_dict(pos, state.grid_size) if isinstance(pos, dict) else None))
+            elif t == "yank" and "target" in action_dict:
+                actions[bot.id] = YankAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "shove" and "target" in action_dict:
+                actions[bot.id] = ShoveAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "leap" and "target" in action_dict:
+                actions[bot.id] = LeapAction(target=safe_position_from_dict(action_dict["target"], state.grid_size))
+            elif t == "scramble":
+                actions[bot.id] = ScrambleAction()
             # else: unknown or malformed -> idle
         self.last_observations = obs_map
         return actions
@@ -170,13 +243,44 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
 
     engine_teams: List[Team] = []
     team_files: Dict[str, str] = {}
-    team_bots_map: Dict[str, List[str]] = {}
+    bot_class_map: Dict[str, Dict[str, str]] = {}
+
+    # helper to map roster strings to Role
+    def role_from_str(s: str) -> Role:
+        return Role(s)
+
     for idx, team_db in enumerate(teams_db):
         positions = pos_lists[idx]
         bots: List[Bot] = []
-        for i, role in enumerate(ROLE_ORDER):
+        roster_list = json.loads(team_db.roster) if team_db.roster else [r.value for r in DEFAULT_ROLE_ORDER]
+        # ensure 5 entries
+        if len(roster_list) != 5:
+            roster_list = roster_list[:5] if len(roster_list) > 5 else roster_list + [r.value for r in DEFAULT_ROLE_ORDER][: (5 - len(roster_list))]
+        class_name_map: Dict[str, str] = {}
+        for i, comp_key in enumerate(roster_list):
+            role = role_from_str(comp_key)
             pos = positions[i]
-            bot_id = f"{team_db.id.hex[:6]}-{role[:2]}"
+            role_code = {
+                Role.SNIPER: "sn",
+                Role.TANK: "ta",
+                Role.BOMBER: "bo",
+                Role.SCOUT: "sc",
+                Role.TELEPORTER: "te",
+                Role.POISONER: "po",
+                Role.TRAP_SETTER: "ts",
+                Role.HEALER: "he",
+                Role.SHIELD_GIVER: "sg",
+                Role.PULLER: "pu",
+                Role.BRUISER: "br",
+                Role.JAMMER: "ja",
+                Role.REFLECTOR: "re",
+                Role.WALL_BUILDER: "wb",
+                Role.PUSHER: "ps",
+                Role.DECOY_CASTER: "dc",
+                Role.LEAPER: "le",
+                Role.SILENCER: "si",
+            }[role]
+            bot_id = f"{team_db.id.hex[:6]}-{role_code}"
             bots.append(
                 Bot(
                     id=bot_id,
@@ -185,16 +289,38 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
                     team_id=str(team_db.id),
                 )
             )
+            # class name mapping: from comp_key to expected class name in user file (PascalCase with underscores retained per spec)
+            class_name = {
+                "tank": "Tank",
+                "sniper": "Sniper",
+                "bomber": "Bomber",
+                "scout": "Scout",
+                "teleporter": "Teleporter",
+                "poisoner": "Poisoner",
+                "trap_setter": "Trap_Setter",
+                "healer": "Healer",
+                "shield_giver": "Shield_Giver",
+                "puller": "Puller",
+                "bruiser": "Bruiser",
+                "jammer": "Jammer",
+                "reflector": "Reflector",
+                "wall_builder": "Wall_Builder",
+                "pusher": "Pusher",
+                "decoy_caster": "Decoy_Caster",
+                "leaper": "Leaper",
+                "silencer": "Silencer",
+            }[comp_key]
+            class_name_map[bot_id] = class_name
         engine_teams.append(Team(id=str(team_db.id), bots=bots))
         team_files[str(team_db.id)] = team_db.code_path
-        team_bots_map[str(team_db.id)] = [b.id for b in bots]
+        bot_class_map[str(team_db.id)] = class_name_map
 
     state = GameState(grid_size=grid_size, teams=engine_teams)
 
     log: List[dict] = []
     turn = 0
     winner_team_id: str | None = None
-    sandbox = _SandboxManager({tid: path for tid, path in team_files.items()}, team_bots_map)
+    sandbox = _SandboxManager(team_files, bot_class_map)
     damage_done_total: Dict[str, int] = {tid: 0 for tid in team_ids}
     damage_by_bot_total: Dict[str, int] = {}
 
@@ -249,6 +375,30 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
             t = ad.get('type')
             if t == 'shield':
                 events.append(f"🛡 {bid} used shield")
+            elif t == 'project_shield':
+                events.append(f"🧲 {bid} projected shield")
+            elif t == 'heal':
+                events.append(f"🧬 {bid} healed an ally")
+            elif t == 'infect':
+                events.append(f"💉 {bid} infected a target")
+            elif t == 'silence':
+                events.append(f"🔇 {bid} silenced a target")
+            elif t == 'mirror':
+                events.append(f"🪞 {bid} readied reflect")
+            elif t == 'drop_trap':
+                events.append(f"🪤 {bid} planted a trap")
+            elif t == 'drop_wall':
+                events.append(f"🧱 {bid} built a wall")
+            elif t == 'clone':
+                events.append(f"🐾 {bid} summoned a decoy")
+            elif t == 'scramble':
+                events.append(f"🛰 {bid} scrambled nearby enemies")
+            elif t == 'yank':
+                events.append(f"🌀 {bid} yanked an enemy")
+            elif t == 'shove':
+                events.append(f"🌀→ {bid} shoved an enemy")
+            elif t == 'leap':
+                events.append(f"🐸 {bid} leaped")
             elif t == 'snipe':
                 # resolve target id from prev occupancy if possible
                 tgt_xy = ad.get('target')
@@ -287,9 +437,19 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
 
         # per-bot cooldowns and shields
         cooldowns = {b.id: b.power_cooldown for b in state.all_bots()}
-        shields = {b.id: b.shield_remaining for b in state.all_bots()}
+        shields = {b.id: b.shield_pool_remaining for b in state.all_bots()}
 
         # collect snapshot
+        # include simple structure overlays and trap triggers
+        structures = {
+            "walls": [[w.x, w.y, w.team_id] for w in state.walls],
+            "traps": [[t.x, t.y, t.team_id] for t in state.traps],
+            "decoys": [[d.x, d.y, d.team_id] for d in state.decoys],
+        }
+        trap_trigs = getattr(engine, 'trap_triggers', [])
+        if trap_trigs:
+            for x,y in trap_trigs:
+                events.append(f"🪤 Trap triggered at [{x},{y}]")
         log.append(
             {
                 "turn": turn,
@@ -299,6 +459,7 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
                 "observations": sandbox.last_observations,
                 "cooldowns": cooldowns,
                 "shields": shields,
+                "structures": structures,
                 "events": events,
             }
         )

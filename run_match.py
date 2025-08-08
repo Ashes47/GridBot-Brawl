@@ -17,6 +17,7 @@ from backend.app.engine import (
 from backend.app.sandbox import load_team, safe_decide
 import multiprocessing as mp
 
+# For local testing, keep a default roster of 5 classic roles
 ROLE_ORDER = [Role.SNIPER, Role.TANK, Role.BOMBER, Role.SCOUT, Role.TELEPORTER]
 
 
@@ -26,18 +27,38 @@ def spawn_positions_duo() -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]
     return top, bottom
 
 
-def build_game_state(file_a: Path, file_b: Path) -> Tuple[GameState, Dict[str, str]]:
+def build_game_state(file_a: Path, file_b: Path) -> Tuple[GameState, Dict[str, dict]]:
     positions_a, positions_b = spawn_positions_duo()
     teams: List[Team] = []
     team_files: Dict[str, str] = {}
-    team_bots_map: Dict[str, List[str]] = {}
+    bot_class_map: Dict[str, Dict[str, str]] = {}
+
+    def role_code(role: Role) -> str:
+        return {
+            Role.SNIPER: "sn",
+            Role.TANK: "ta",
+            Role.BOMBER: "bo",
+            Role.SCOUT: "sc",
+            Role.TELEPORTER: "te",
+        }[role]
+
+    def class_name_for(role: Role) -> str:
+        return {
+            Role.SNIPER: "Sniper",
+            Role.TANK: "Tank",
+            Role.BOMBER: "Bomber",
+            Role.SCOUT: "Scout",
+            Role.TELEPORTER: "Teleporter",
+        }[role]
 
     for idx, (team_file, positions) in enumerate([(file_a, positions_a), (file_b, positions_b)]):
         team_id = f"T{idx+1}"
         bots: List[Bot] = []
+        class_map: Dict[str, str] = {}
         for i, role in enumerate(ROLE_ORDER):
             pos = positions[i]
-            bot_id = f"{team_id}-{role[:2]}"
+            code = role_code(role)
+            bot_id = f"{team_id}-{code}"
             bots.append(
                 Bot(
                     id=bot_id,
@@ -46,18 +67,19 @@ def build_game_state(file_a: Path, file_b: Path) -> Tuple[GameState, Dict[str, s
                     team_id=team_id,
                 )
             )
+            class_map[bot_id] = class_name_for(role)
         teams.append(Team(id=team_id, bots=bots))
         team_files[team_id] = str(team_file)
-        team_bots_map[team_id] = [b.id for b in bots]
+        bot_class_map[team_id] = class_map
 
     state = GameState(grid_size=GRID_DUO, teams=teams)
-    return state, {"files": team_files, "bots": team_bots_map}
+    return state, {"files": team_files, "class_map": bot_class_map}
 
 
 class SandboxManager:
-    def __init__(self, team_files: Dict[str, str], team_bots_map: Dict[str, List[str]]):
+    def __init__(self, team_files: Dict[str, str], bot_class_map: Dict[str, Dict[str, str]]):
         self.ctrls = {
-            tid: load_team(tid, path, team_bots_map[tid])
+            tid: load_team(tid, path, bot_class_map[tid])
             for tid, path in team_files.items()
         }
 
@@ -121,7 +143,7 @@ class SandboxManager:
 
 def run_match(file_a: str, file_b: str):
     state, mapping = build_game_state(Path(file_a), Path(file_b))
-    sandbox = SandboxManager(mapping["files"], mapping["bots"])
+    sandbox = SandboxManager(mapping["files"], mapping["class_map"])
 
     log = []
     turn = 0
