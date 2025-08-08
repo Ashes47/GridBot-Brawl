@@ -187,15 +187,18 @@
         }
       });
 
-      // Submit for evaluation: queue vs baseline as a quick check
+      // Submit for evaluation: enqueue leaderboard matches via Celery
       document.getElementById('submit-eval').onclick = async () => {
         const el = document.getElementById('eval-status');
+        const password = prompt('Enter team password to submit for evaluation');
+        if (!password) { el.textContent = 'Cancelled'; return; }
         el.textContent = 'Submitting…';
         try {
-          const res = await fetch(`http://localhost:8000/simulate/vs_baseline?team_id=${teamId}`, { method: 'POST' });
+          const form = new FormData();
+          form.append('password', password);
+          const res = await fetch(`http://localhost:8000/teams/${teamId}/submit_for_evaluation`, { method: 'POST', body: form });
           if (!res.ok) { el.textContent = 'Failed'; alert('Failed: ' + (await res.text())); return; }
-          const data = await res.json();
-          el.textContent = `Queued match ${data.match_id}`;
+          el.textContent = 'Queued evaluation';
         } catch (e) {
           el.textContent = 'Failed';
         }

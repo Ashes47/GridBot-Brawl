@@ -13,6 +13,7 @@ import shutil
 
 from ..database import get_session
 from ..db_models import Member, Team
+from ..tasks import schedule_evaluation_for_team
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -335,3 +336,26 @@ async def team_matches(team_id: str, session: AsyncSession = Depends(get_session
             }
         )
     return data
+
+
+@router.post("/{team_id}/submit_for_evaluation")
+async def submit_for_evaluation(team_id: str, password: str = Form(...), session: AsyncSession = Depends(get_session)):
+    """Submit a team for leaderboard evaluation: schedule duo and quad matches via Celery."""
+    try:
+        tid = uuid.UUID(team_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Invalid team id")
+
+    result = await session.execute(select(Team).where(Team.id == tid))
+    team: Team | None = result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    from passlib.hash import bcrypt
+    if not bcrypt.verify(password, team.password_hash):
+        raise HTTPException(status_code=403, detail="Invalid password")
+
+    # enqueue simulation scheduling (no back-compat background tasks)
+    schedule_evaluation_for_team.apply_async(args=[team_id], queue="simulation")
+
+    return {"status": "queued"}

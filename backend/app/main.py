@@ -23,16 +23,13 @@ app.add_middleware(
 
 # Create tables at startup (simple approach for early development)
 from .database import engine, Base
-from .scheduler import scheduler_loop
 
 
 @app.on_event("startup")
 async def _startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # launch background scheduler
-    import asyncio
-    asyncio.create_task(scheduler_loop())
+
 
 
 app.include_router(team_router)

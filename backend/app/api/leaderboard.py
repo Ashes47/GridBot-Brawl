@@ -9,6 +9,8 @@ from ..database import get_session
 from ..db_models import Match, Team
 import os
 
+from ..tasks import schedule_full_evaluation
+
 ADMIN_SECRET = os.getenv("ADMIN_PASSWORD")
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
@@ -120,7 +122,7 @@ async def _aggregate(session: AsyncSession, mode: str) -> LeaderboardResponse:
     )
 
 
-@router.post("/re-evaluate", status_code=204)
+@router.post("/re-evaluate", status_code=202)
 async def re_evaluate_matches(
     admin_password: str = Form(...),
     session: AsyncSession = Depends(get_session)
@@ -128,8 +130,13 @@ async def re_evaluate_matches(
     if admin_password != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin password")
     
+    # Clear existing matches
     await session.execute(Match.__table__.delete())
     await session.commit()
+
+    # Enqueue full evaluation scheduling
+    schedule_full_evaluation.apply_async(queue="simulation")
+    return {"status": "queued"}
 
 
 @router.get("/duo", response_model=LeaderboardResponse)

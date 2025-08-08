@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from ..database import get_session
 from ..db_models import Match, Team
+import os
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -71,11 +72,26 @@ async def download_log(match_id: str, session: AsyncSession = Depends(get_sessio
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
 
-    log_path = Path(match.log_path)
-    if not log_path.exists():
-        raise HTTPException(status_code=404, detail="Log file missing")
+    # Try stored path first
+    raw = match.log_path or ""
+    p = Path(raw)
+    if p.is_absolute() and p.exists():
+        final_path = p
+    else:
+        # Rebuild from DATA_DIR and filename
+        data_dir = Path(os.getenv("DATA_DIR", "./data/matches"))
+        candidate = data_dir / (p.name if p.name else raw)
+        if candidate.exists():
+            final_path = candidate
+        else:
+            # Also try interpreting stored path as relative under /app
+            alt = Path("/app") / raw
+            if alt.exists():
+                final_path = alt
+            else:
+                raise HTTPException(status_code=404, detail="Log file missing")
 
-    return FileResponse(log_path, media_type="application/json", filename=f"{match_id}.json")
+    return FileResponse(final_path, media_type="application/json", filename=f"{match_id}.json")
 
 
 @router.get("/")

@@ -14,11 +14,11 @@ try:
 except ImportError:
     RLIMIT_SUPPORTED = False
 
-TIMEOUT_SECONDS = 0.1  # 100 ms per decision
+TIMEOUT_SECONDS = 0.05  # 50 ms per decision (tuned for throughput)
 MAX_CPU_SECONDS = 1  # wall CPU seconds for safety
 MAX_MEMORY_BYTES = 256 * 1024 * 1024  # 256 MB
 
-# Use a safer multiprocessing context to avoid excessive memory duplication and thread issues
+# Prefer 'fork' for fast startup; fallback to 'forkserver', then 'spawn'
 try:
     MP_CTX = mp.get_context("fork")
 except ValueError:
@@ -30,7 +30,8 @@ except ValueError:
 
 @dataclass
 class BotProxy:
-    decide: types.MethodType  # function(state_dict) -> dict
+    module_path: str
+    class_name: str
 
 
 @dataclass
@@ -42,7 +43,7 @@ class TeamController:
 # ---------------- Internal helpers ----------------
 
 def _load_module_from_path(path: Path) -> types.ModuleType:
-    # Ensure the directory is importable so multiprocessing children can unpickle classes
+    # Ensure the directory is importable so multiprocessing children can re-import module
     if str(path.parent) not in sys.path:
         sys.path.insert(0, str(path.parent))
     spec = importlib.util.spec_from_file_location(path.stem, str(path))
@@ -67,33 +68,31 @@ def _ensure_classes(module: types.ModuleType):
 
 
 def load_team(team_id: str, file_path: str, bot_ids: List[str]) -> TeamController:
-    """Load bot classes and create instances bound to bot_ids order ROLE_ORDER."""
+    """Load bot classes and capture module/class identities bound to bot_ids order ROLE_ORDER."""
     module = _load_module_from_path(Path(file_path))
     class_list = _ensure_classes(module)
 
     bots: Dict[str, BotProxy] = {}
     for bot_id, cls in zip(bot_ids, class_list):
-        instance = cls()
-        if not hasattr(instance, "decide"):
-            raise ValueError("Bot class must implement decide() method")
-        bots[bot_id] = BotProxy(decide=instance.decide)  # type: ignore[arg-type]
+        bots[bot_id] = BotProxy(module_path=str(Path(file_path)), class_name=cls.__name__)
     return TeamController(team_id=team_id, bots=bots)
 
 
 # ---------------- Decision wrapper with timeout ----------------
 
-def _call_decide(method, observation, conn):
+def _call_decide(module_path: str, class_name: str, observation: dict, conn):
     # Apply resource limits inside child before executing user code
     if RLIMIT_SUPPORTED:
         try:
             resource.setrlimit(resource.RLIMIT_AS, (MAX_MEMORY_BYTES, MAX_MEMORY_BYTES))
-            # Avoid strict CPU limit for persistent/pooled scenarios; rely on TIMEOUT_SECONDS
-            # resource.setrlimit(resource.RLIMIT_CPU, (MAX_CPU_SECONDS, MAX_CPU_SECONDS))
         except Exception:
             pass
 
     try:
-        action = method(observation)
+        module = _load_module_from_path(Path(module_path))
+        cls = getattr(module, class_name)
+        instance = cls()
+        action = instance.decide(observation)
     except Exception as exc:
         try:
             conn.send(exc)
@@ -109,12 +108,13 @@ def _call_decide(method, observation, conn):
 
 
 def safe_decide(bot_proxy: BotProxy, observation: dict) -> dict:
-    """Run bot decide with timeout using a forked child and a Pipe to avoid
-    background feeder threads. Ensures full cleanup to prevent leaks.
+    """Run bot decide with timeout using a spawned child and a Pipe.
+    Ensures full cleanup to prevent leaks.
     """
     parent_conn, child_conn = MP_CTX.Pipe(duplex=False)
-    p = MP_CTX.Process(target=_call_decide, args=(bot_proxy.decide, observation, child_conn))
-    p.daemon = True
+    p = MP_CTX.Process(target=_call_decide, args=(bot_proxy.module_path, bot_proxy.class_name, observation, child_conn))
+    # Make sure child is NOT daemon so it can create further children if needed
+    p.daemon = False
     p.start()
     # Parent no longer needs child's end
     child_conn.close()
