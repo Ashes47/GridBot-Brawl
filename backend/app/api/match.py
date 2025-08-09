@@ -57,6 +57,8 @@ async def get_match(match_id: str, session: AsyncSession = Depends(get_session))
         "created_at": match.created_at,
         "log_path": match.log_path,
         "status": match.status,
+        "map_name": match.map_name,
+        "map_seed": match.map_seed,
     }
 
 
@@ -105,6 +107,8 @@ async def list_matches(limit: int = 50, session: AsyncSession = Depends(get_sess
             "winner_team_id": str(m.winner_team_id) if m.winner_team_id else None,
             "created_at": m.created_at,
             "status": m.status,
+            "map_name": m.map_name,
+            "map_seed": m.map_seed,
         }
         for m in matches
     ]

@@ -6,14 +6,211 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; margin: 30px; max-width: 900px; }
-    h1, h2 { color: #2c3e50; }
-    code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-    th { background: #f0f0f0; }
+    body { 
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif; 
+      line-height: 1.6; 
+      margin: 0; 
+      padding: 20px;
+      max-width: 1000px; 
+      margin: 0 auto;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+    
+    main {
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 16px;
+      padding: 32px;
+      margin-top: 20px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    
+    h1 { 
+      color: #f1f5f9; 
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    h2 { 
+      color: #60a5fa; 
+      border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+      padding-bottom: 8px;
+      margin-top: 32px;
+      font-size: 1.5rem;
+    }
+    
+    p {
+      color: #cbd5e1;
+      margin-bottom: 16px;
+    }
+    
+    code { 
+      background: rgba(15, 23, 42, 0.8);
+      color: #a78bfa;
+      padding: 3px 6px; 
+      border-radius: 4px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+    
+    pre {
+      background: rgba(15, 23, 42, 0.9);
+      color: #e2e8f0;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      line-height: 1.5;
+    }
+    
+    table { 
+      border-collapse: collapse; 
+      width: 100%; 
+      margin-bottom: 24px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    th, td { 
+      border: 1px solid rgba(71, 85, 105, 0.3); 
+      padding: 12px; 
+      text-align: left; 
+    }
+    
+    th { 
+      background: rgba(59, 130, 246, 0.2);
+      color: #f1f5f9;
+      font-weight: 600;
+    }
+    
+    td {
+      color: #cbd5e1;
+    }
+    
     .emoji { font-size: 24px; }
-    #sample-buttons button { margin-right: 10px; }
+    
+    #sample-buttons { 
+      margin: 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    
+    #sample-buttons button { 
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    #sample-buttons button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    ol, ul {
+      color: #cbd5e1;
+      margin-bottom: 20px;
+    }
+    
+    li {
+      margin-bottom: 8px;
+    }
+    
+    a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    
+    a:hover {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+    
+    #modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+    
+    #modal-box {
+      background: rgba(15, 23, 42, 0.98);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 1000px;
+      margin-top: 20px;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    
+    #close {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    #modal-title {
+      color: #f1f5f9;
+      margin-bottom: 16px;
+      font-size: 1.5rem;
+    }
+    
+    #code {
+      background: rgba(0, 0, 0, 0.8) !important;
+      color: #e2e8f0 !important;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace !important;
+      font-size: 13px !important;
+      line-height: 1.4 !important;
+      border: 1px solid rgba(71, 85, 105, 0.5) !important;
+      border-radius: 8px !important;
+      padding: 20px !important;
+      white-space: pre !important;
+      overflow: auto !important;
+      max-height: 70vh !important;
+    }
+    
+    .info-box {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+      border-left: 4px solid #3b82f6;
+    }
+    
+    .info-box strong {
+      color: #60a5fa;
+    }
   </style>
 </head>
 <body>
@@ -26,13 +223,14 @@
         <a href="signup.html">Signup</a>
         <a href="guide.html">Guide</a>
         <a href="bots.html">Bots</a>
+        <a href="maps.html">Maps</a>
       </nav>
     </div>
   </header>
 
-  <main style="max-width:900px; margin:30px auto;">
-    <h1>Game Guide</h1>
-    <p>This page explains how to participate, upload your bots, and interpret match results.</p>
+  <main>
+    <h1>🎮 Game Guide</h1>
+    <p>Learn how to participate, upload your bots, and master the strategic depths of GridBot Brawl.</p>
 
   <h2>Overview</h2>
   <p>GridBot Brawl is a turn-based coding arena. Teams submit one Python file that implements
@@ -98,10 +296,33 @@
   <ul>
     <li>All bots start with 100 HP.</li>
     <li>Movement is orthogonal; some powers allow diagonal placement (walls/decoy) or diagonal jumps (leap).</li>
-    <li>Visibility uses Chebyshev radius 4; LoS is blocked by bots, decoys, and walls.</li>
-    <li>End-of-turn: apply DoT, decrement cooldowns/statuses/TTLs, expire shields.</li>
+    <li>Visibility uses Chebyshev radius 4; LoS is blocked by bots, decoys, walls, and forest.</li>
+    <li>End-of-turn: apply DoT, decrement cooldowns/statuses/TTLs, zones (Boost/Heal/Damage/Teleport), expire shields.</li>
     <li>No friendly fire exceptions: AoE (bomber/trap) can hit allies.</li>
   </ul>
+
+  <h2>Maps & Terrain</h2>
+  <div class="info-box">
+    <strong>🗺️ Map System:</strong> Every match runs on a <strong>seed-generated</strong> map defined by <code>maps/map_rules.json</code>. Maps are randomly assigned server-side for fairness. See the <a href="maps.html">Maps Guide</a> for detailed terrain and zone mechanics.
+  </div>
+  
+  <style>
+    .terrain-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 16px 0}
+    .terrain-item{display:flex;align-items:center;gap:10px;background:rgba(51,65,85,0.35);border:1px solid rgba(71,85,105,0.35);border-radius:8px;padding:8px 12px}
+    .terrain-swatch{width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,0.35);box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15)}
+  </style>
+  <p><strong>Quick Reference:</strong></p>
+  <div class="terrain-legend">
+    <div class="terrain-item"><span class="terrain-swatch" style="background: rgba(100,116,139,0.7)"></span> <strong>Walls</strong>: Block movement and line-of-sight</div>
+    <div class="terrain-item"><span class="terrain-swatch" style="background: rgba(34,197,94,0.28)"></span> <strong>Forest</strong>: Blocks LoS, allows movement</div>
+    <div class="terrain-item"><span class="terrain-swatch" style="background: rgba(120,72,0,0.28)"></span> <strong>Swamp</strong>: Slows bots next turn</div>
+    <div class="terrain-item"><span class="terrain-swatch" style="background: rgba(59,130,246,0.22)"></span> <strong>Ice</strong>: Causes sliding movement</div>
+    <div class="terrain-item"><span class="terrain-swatch" style="background: rgba(37,99,235,0.35)"></span> <strong>Water</strong>: Impassable, doesn't block LoS</div>
+    <div class="terrain-item">💚 <strong>Heal Zone</strong>: +20 HP at end of turn</div>
+    <div class="terrain-item">💀 <strong>Damage Zone</strong>: -10 HP at end of turn</div>
+    <div class="terrain-item">⚡ <strong>Boost Zone</strong>: Extra cooldown reduction</div>
+    <div class="terrain-item">✨ <strong>Teleport Zone</strong>: Random relocation</div>
+  </div>
 
   <h2>Observation Object (per turn)</h2>
   <pre><code>{
@@ -111,13 +332,19 @@
   "visible_enemies": [ { "id": "b2-ta", "x": 7, "y": 3, "team": "b2", "component": "tank" } ],
   "visible_allies": [ { "id": "a1-te", "x": 5, "y": 3, "team": "a1", "component": "teleporter" } ],
   "visible_walls": [ [2,1], [3,1] ],
+  "visible_static_walls": [ [4,4] ],
   "visible_decoys": [ [6,4, "b2"] ],
-  "visible_traps": [ [5,5, "a1"] ]
+  "visible_traps": [ [5,5, "a1"] ],
+  "visible_terrain": [ [2,3, "forest"], [7,7, "swamp"] ],
+  "visible_zones": [ [2,8, ["heal"]], [5,5, ["boost"]] ]
 }</code></pre>
   <ul>
     <li><code>visible_walls</code>: wall tiles within radius 4 (Chebyshev).</li>
+    <li><code>visible_static_walls</code>: map walls within radius 4.</li>
     <li><code>visible_decoys</code>: decoy positions within radius 4 as <code>[x,y, team_id]</code>.</li>
     <li><code>visible_traps</code>: only allied traps (team visibility) within radius 4 as <code>[x,y, team_id]</code>.</li>
+    <li><code>visible_terrain</code>: terrain tiles within radius 4 as <code>[x,y, type]</code>.</li>
+    <li><code>visible_zones</code>: zones within radius 4 as <code>[x,y, [types...]]</code>.</li>
   </ul>
 
   <h2>Sample Bot Files</h2>

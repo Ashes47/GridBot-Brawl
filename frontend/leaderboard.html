@@ -6,16 +6,176 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px auto; max-width: 800px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
-    th { background: #f5f5f5; }
-    .rank1 td { background:#fff9c4; } /* light yellow */
-    .rank2 td { background:#e0e7ff; }
-    .rank3 td { background:#fde68a; }
-    .tab{padding:6px 12px;border:1px solid #cbd5e1;border-bottom:none;cursor:pointer;border-radius:4px 4px 0 0;background:#e2e8f0;margin-right:4px;}
-    .tab.active{background:#fff;font-weight:bold;}
-    #modes { margin-bottom: 12px; }
+    body {
+      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+    }
+    
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: rgba(30, 41, 59, 0.95);
+      backdrop-filter: blur(16px);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.25);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    h1 {
+      color: #f8fafc;
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 2.5rem;
+      font-weight: 700;
+      text-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    }
+    
+    .modes-container {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    
+    .mode-link {
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #94a3b8;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      background: transparent;
+    }
+    
+    .mode-link:hover, .mode-link.active {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      transform: translateY(-1px);
+    }
+    
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding: 16px 20px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 10px;
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    
+    .status-text {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+    
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    
+    th, td {
+      padding: 16px 20px;
+      text-align: left;
+      border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    th {
+      background: rgba(59, 130, 246, 0.1);
+      color: #93c5fd;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.025em;
+    }
+    
+    td {
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    
+    tr:hover {
+      background: rgba(59, 130, 246, 0.05);
+    }
+    
+    tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .rank1 td {
+      background: linear-gradient(90deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.05));
+      border-left: 4px solid #ffd700;
+    }
+    
+    .rank2 td {
+      background: linear-gradient(90deg, rgba(192, 192, 192, 0.15), rgba(192, 192, 192, 0.05));
+      border-left: 4px solid #c0c0c0;
+    }
+    
+    .rank3 td {
+      background: linear-gradient(90deg, rgba(205, 127, 50, 0.15), rgba(205, 127, 50, 0.05));
+      border-left: 4px solid #cd7f32;
+    }
+    
+    a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s ease;
+    }
+    
+    a:hover {
+      color: #93c5fd;
+      text-decoration: underline;
+    }
+    
+    .rank-number {
+      font-weight: 700;
+      font-size: 16px;
+    }
+    
+    .rank1 .rank-number {
+      color: #ffd700;
+    }
+    
+    .rank2 .rank-number {
+      color: #c0c0c0;
+    }
+    
+    .rank3 .rank-number {
+      color: #cd7f32;
+    }
   </style>
 </head>
 <body>
@@ -27,46 +187,58 @@
         <a href="teams.html">Teams</a>
         <a href="signup.html">Signup</a>
         <a href="guide.html">Guide</a>
+        <a href="bots.html">Bots</a>
+        <a href="maps.html">Maps</a>
       </nav>
     </div>
   </header>
-  <h1>Leaderboard</h1>
-  <div id="modes">
-    <a href="leaderboard.html?mode=duo">Duo</a> |
-    <a href="leaderboard.html?mode=quad">Quad</a>
+  
+  <div class="container">
+    <h1>Leaderboard</h1>
+    
+    <div class="modes-container">
+      <a href="leaderboard.html?mode=duo" class="mode-link" id="duo-link">🤖 Duo Mode</a>
+      <a href="leaderboard.html?mode=quad" class="mode-link" id="quad-link">🤖🤖 Quad Mode</a>
+    </div>
+    
+    <div class="status-bar">
+      <div id="status" class="status-text"></div>
+      <button id="re-eval-btn">Admin Re-evaluate</button>
+    </div>
+    
+    <table>
+      <thead><tr><th>Rank</th><th>Team Name</th><th>W/L/D</th><th>Points</th><th>HP Total</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
   </div>
-  <div id="status" style="margin-bottom:12px;"></div>
-  <div style="margin-bottom: 12px; text-align: right;">
-    <button id="re-eval-btn">Admin Re-evaluate</button>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Name</th><th>W/L/D</th><th>Pts</th><th>HP Sum</th></tr></thead>
-    <tbody id="tbody"></tbody>
-  </table>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     let mode = params.get('mode') || 'duo';
-    function setActive(){
-      document.getElementById('tab-duo').classList.toggle('active',mode==='duo');
-      document.getElementById('tab-quad').classList.toggle('active',mode==='quad');
-      document.getElementById('title').textContent = mode==='duo'?'Duo Leaderboard':'Quad Leaderboard';
-    }
 
     async function load() {
       const mode = (new URLSearchParams(window.location.search)).get('mode') || 'duo';
+      
+      // Update active mode styling
+      document.getElementById('duo-link').classList.toggle('active', mode === 'duo');
+      document.getElementById('quad-link').classList.toggle('active', mode === 'quad');
       const res = await fetch(`http://localhost:8000/leaderboard/${mode}`);
       const data = await res.json();
       const tbody = document.getElementById('tbody');
       tbody.innerHTML='';
       data.teams.forEach((t, idx) => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${idx+1}</td><td><a href="team.html?id=${t.team_id}" target="_blank">${t.name}</a></td><td>${t.wins}/${t.losses}/${t.draws}</td><td>${t.points}</td><td>${t.hp_total}</td>`;
+        const rankClass = idx === 0 ? 'rank1' : idx === 1 ? 'rank2' : idx === 2 ? 'rank3' : '';
+        tr.className = rankClass;
+        tr.innerHTML = `<td class="rank-number">${idx+1}</td><td><a href="team.html?id=${t.team_id}" target="_blank">${t.name}</a></td><td>${t.wins}/${t.losses}/${t.draws}</td><td>${t.points}</td><td>${t.hp_total}</td>`;
         tbody.appendChild(tr);
       });
       // update status
       const statusDiv = document.getElementById('status');
-      statusDiv.textContent = `${data.pending_matches} pending | ${data.running_matches} running`;
+      statusDiv.textContent = `${data.pending_matches} pending matches • ${data.running_matches} running matches`;
+      
+      // Update page title
+      document.querySelector('h1').textContent = mode === 'duo' ? 'Duo Leaderboard' : 'Quad Leaderboard';
     }
     document.getElementById('re-eval-btn').onclick = async () => {
       const adminPass = prompt('Enter admin password to re-evaluate all matches');

@@ -1,0 +1,20 @@
+{
+  "grid_size": {
+    "duo": [10, 10],
+    "quad": [15, 15]
+  },
+  "wall_density": 0.08,
+  "forest_density": 0.05,
+  "swamp_density": 0.03,
+  "ice_density": 0.02,
+  "water_density": 0.00,
+  "zone_counts": {
+    "heal": 2,
+    "damage": 2,
+    "boost": 1,
+    "teleport": 1
+  },
+  "spawn_margin": 2,
+  "ensure_path_between_spawns": true
+}
+

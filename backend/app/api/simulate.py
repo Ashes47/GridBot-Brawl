@@ -37,6 +37,8 @@ async def simulate_duo(req: SimulateRequest, session: AsyncSession = Depends(get
         status="pending",
         log_path="",
         created_at=datetime.utcnow(),
+        map_name=None,
+        map_seed=None,
     )
     session.add(match)
     await session.flush()
@@ -60,6 +62,8 @@ async def simulate_quad(req: SimulateRequest, session: AsyncSession = Depends(ge
         status="pending",
         log_path="",
         created_at=datetime.utcnow(),
+        map_name=None,
+        map_seed=None,
     )
     session.add(match)
     await session.flush()

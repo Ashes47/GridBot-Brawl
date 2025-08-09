@@ -30,52 +30,59 @@
       border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.3);
       background: #1e293b;
+      position: relative;
+      width: 100%;
+      height: auto;
+      display: block;
     }
     
     #layout { 
-      display: flex; 
-      gap: 24px; 
-      justify-content: center; 
-      align-items: flex-start; 
-      margin-top: 24px; 
-      max-width: 1600px;
+      display: grid; 
+      grid-template-columns: 28% 44% 28%;
+      column-gap: 16px; 
+      align-items: start; 
+      margin-top: 20px; 
+      max-width: 100%;
+      padding-left: 2%;
+      padding-right: 2%;
+      box-sizing: border-box;
       margin-left: auto;
       margin-right: auto;
     }
+    /* Ensure the center column content stretches full column width */
+    #layout > div:nth-child(2){ width: 100%; }
     
     /* Left Panel Styling */
     #left-panel { 
-      width: 950px;
-      max-height: 800px;
+      width: 100%;
+      max-height: 650px;
       overflow: hidden;
       text-align: left;
-      border-radius: 22px;
-      background: rgba(30, 41, 59, 0.72);
-      box-shadow: 0 12px 48px 0 rgba(16, 24, 40, 0.45), 0 1.5px 0 0 #3b82f6 inset;
-      border: 1.5px solid rgba(59, 130, 246, 0.13);
-      backdrop-filter: blur(18px) saturate(1.2);
+      border-radius: 16px;
+      background: rgba(30, 41, 59, 0.85);
+      box-shadow: 0 8px 32px rgba(16, 24, 40, 0.3);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      backdrop-filter: blur(12px);
       margin-top: 8px;
-      transition: box-shadow 0.2s, border 0.2s;
+      transition: box-shadow 0.2s ease;
     }
     #left-panel:hover, #right-panel:hover {
-      box-shadow: 0 16px 64px 0 rgba(59, 130, 246, 0.18), 0 1.5px 0 0 #3b82f6 inset;
-      border: 1.5px solid rgba(59, 130, 246, 0.22);
+      box-shadow: 0 12px 48px rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.4);
     }
     .panel-header {
-      padding: 22px 32px 18px 32px;
-      background: linear-gradient(90deg, rgba(59,130,246,0.18) 0%, rgba(30,41,59,0.85) 100%);
+      padding: 16px 24px;
+      background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(30,41,59,0.9) 100%);
       color: #f1f5f9;
-      font-weight: 800;
-      border-radius: 22px 22px 0 0;
-      font-size: 1.25rem;
+      font-weight: 700;
+      border-radius: 16px 16px 0 0;
+      font-size: 1.1rem;
       letter-spacing: 0.01em;
-      text-shadow: 0 2px 8px rgba(59,130,246,0.12);
-      border-bottom: 1.5px solid rgba(59,130,246,0.13);
-      box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+      border-bottom: 1px solid rgba(71, 85, 105, 0.3);
     }
     .panel-content {
-      padding: 28px 32px 24px 32px;
-      max-height: calc(800px - 80px);
+      padding: 20px 24px;
+      max-height: calc(650px - 60px);
       overflow-y: auto;
       border: none;
       background: transparent;
@@ -240,23 +247,23 @@
     
     /* Right Panel Styling */
     #right-panel { 
-      width: 950px;
-      max-height: 800px;
+      width: 100%;
+      max-height: 650px;
       overflow: hidden;
       text-align: left;
-      border-radius: 22px;
-      background: rgba(30, 41, 59, 0.72);
-      box-shadow: 0 12px 48px 0 rgba(16, 24, 40, 0.45), 0 1.5px 0 0 #3b82f6 inset;
-      border: 1.5px solid rgba(59, 130, 246, 0.13);
-      backdrop-filter: blur(18px) saturate(1.2);
+      border-radius: 16px;
+      background: rgba(30, 41, 59, 0.85);
+      box-shadow: 0 8px 32px rgba(16, 24, 40, 0.3);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      backdrop-filter: blur(12px);
       margin-top: 8px;
-      transition: box-shadow 0.2s, border 0.2s;
+      transition: box-shadow 0.2s ease;
     }
     
     #log { 
       font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; 
-      font-size: 13px;
-      max-height: calc(750px - 200px);
+      font-size: 12px;
+      max-height: calc(650px - 200px);
       overflow-y: auto;
       padding-right: 12px;
     }
@@ -360,41 +367,57 @@
       background: rgba(30, 41, 59, 0.95);
       backdrop-filter: blur(16px);
       border-radius: 16px;
-      padding: 24px;
+      padding: 20px;
+      width: 150%;
       margin-top: 20px;
+      margin-left: -25%;
       box-shadow: 0 12px 40px rgba(0,0,0,0.25);
       border: 1px solid rgba(71, 85, 105, 0.3);
     }
     
-    .control-group {
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    
+    .control-row {
       display: flex;
       gap: 12px;
       align-items: center;
-      margin-bottom: 16px;
+      justify-content: center;
       flex-wrap: wrap;
     }
     
-    .control-group:last-child {
-      margin-bottom: 0;
+    .control-section {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 12px;
+      background: rgba(51, 65, 85, 0.3);
+      border-radius: 10px;
+      border: 1px solid rgba(71, 85, 105, 0.2);
     }
     
-    .control-group label {
-      font-size: 14px;
+    .control-section label {
+      font-size: 13px;
       font-weight: 600;
       color: #e2e8f0;
+      white-space: nowrap;
     }
     
     button {
       background: linear-gradient(135deg, #3b82f6, #1d4ed8);
       color: white;
       border: none;
-      padding: 10px 16px;
-      border-radius: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       transition: all 0.2s ease;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      white-space: nowrap;
     }
     
     button:hover {
@@ -433,15 +456,22 @@
       box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
     }
     
-    #slider {
+    .timeline-container {
       flex: 1;
-      min-width: 200px;
+      min-width: 300px;
       margin: 0 16px;
+      position: relative;
+    }
+    
+    #slider {
+      width: 100%;
       height: 8px;
       border-radius: 4px;
       background: rgba(71, 85, 105, 0.5);
       outline: none;
       appearance: none;
+      position: relative;
+      z-index: 2;
     }
     
     #slider::-webkit-slider-thumb {
@@ -453,6 +483,50 @@
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
     }
+    
+    .timeline-events {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    
+    .timeline-event {
+      position: absolute;
+      width: 4px;
+      height: 12px;
+      top: -2px;
+      border-radius: 2px;
+      transform: translateX(-2px);
+    }
+    
+    .timeline-event.death { background: #ef4444; height: 16px; top: -4px; }
+    .timeline-event.explosion { background: #f97316; }
+    .timeline-event.snipe { background: #eab308; }
+    .timeline-event.shield { background: #3b82f6; }
+    
+    .bookmark-btn {
+      background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      margin-right: 4px;
+      transition: all 0.2s ease;
+    }
+    
+    .bookmark-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    }
+    
+
     
     select {
       padding: 8px 12px;
@@ -470,26 +544,26 @@
     
     /* Legend Styling */
     .legend-container {
-      background: rgba(30, 41, 59, 0.95);
-      backdrop-filter: blur(16px);
-      border-radius: 16px;
-      margin-top: 20px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(12px);
+      border-radius: 12px;
+      width: 100%;
+      margin-top: 16px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.2);
       border: 1px solid rgba(71, 85, 105, 0.3);
       overflow: hidden;
     }
     
     .legend-header {
-      padding: 16px 20px;
+      padding: 12px 16px;
       background: linear-gradient(135deg, #10b981, #059669);
       color: white;
-      font-weight: 700;
-      font-size: 15px;
+      font-weight: 600;
+      font-size: 14px;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     
     .legend-toggle {
@@ -502,17 +576,17 @@
     }
     
     .legend-content {
-      padding: 20px;
-      font-size: 15px;
-      line-height: 1.6;
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.5;
       transition: all 0.3s ease;
-      max-height: 250px;
+      max-height: 200px;
       overflow: hidden;
     }
     
     .legend-content.collapsed {
       max-height: 0;
-      padding: 0 20px;
+      padding: 0 16px;
     }
     
     .legend-item {
@@ -525,6 +599,17 @@
       border: 1px solid rgba(71, 85, 105, 0.3);
       color: #e2e8f0;
       font-weight: 500;
+    }
+    /* Compact color swatch for terrain legend items */
+    .legend-swatch {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      margin-right: 8px;
+      vertical-align: -2px;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
     }
     
     /* Modal Styling */
@@ -630,6 +715,38 @@
       font-weight: 600;
       font-size: 16px;
     }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+      #layout {
+        grid-template-columns: 30% 40% 30%;
+        column-gap: 12px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      #layout {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding-left: 4%;
+        padding-right: 4%;
+      }
+      
+      .control-row {
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .control-section {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .timeline-container {
+        min-width: 200px;
+        margin: 0 8px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -641,6 +758,8 @@
         <a href="teams.html">Teams</a>
         <a href="signup.html">Signup</a>
         <a href="guide.html">Guide</a>
+        <a href="bots.html">Bots</a>
+        <a href="maps.html">Maps</a>
       </nav>
     </div>
   </header>
@@ -652,6 +771,7 @@
         <div class="tabs">
           <button class="tab-btn active" data-tab="stats">Stats</button>
           <button class="tab-btn" data-tab="inspect">Inspect</button>
+          <button class="tab-btn" data-tab="charts">Charts</button>
         </div>
         <div id="tab-stats">
           <div id="bot-stats"></div>
@@ -675,6 +795,10 @@
             <pre id="inspect-output"></pre>
           </div>
         </div>
+        <div id="tab-charts" style="display:none;">
+          <div style="font-weight:700; margin:12px 0; color:#e2e8f0; font-size:15px;">HP Over Time</div>
+          <canvas id="hp-chart" width="400" height="200" style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; border: 1px solid rgba(51, 65, 85, 0.5);"></canvas>
+        </div>
       </div>
     </div>
     
@@ -683,33 +807,71 @@
       <div id="info" style="margin-top:16px; font-weight:600; color:white; text-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>
       
       <div class="controls-container">
-        <div class="control-group">
-          <button id="play">▶️ Play</button>
-          <button id="pause">⏸️ Pause</button>
-          <button id="speed1" class="speed-btn">1x</button>
-          <button id="speed2" class="speed-btn">2x</button>
-          <button id="speed4" class="speed-btn">4x</button>
-          <input type="range" id="slider" min="0" value="0">
-        </div>
-        
-        <div class="control-group">
-          <button id="back5" class="nav-btn">⏮ -5</button>
-          <button id="back1" class="nav-btn">◀ -1</button>
-          <button id="fwd1" class="nav-btn">+1 ▶</button>
-          <button id="fwd5" class="nav-btn">+5 ⏭</button>
-          <button id="prevEvent" class="action-btn">Prev Event</button>
-          <button id="nextEvent" class="action-btn">Next Event</button>
-        </div>
-        
-        <div class="control-group">
-          <button id="reverse" class="action-btn">🔄 Reverse</button>
-          <button id="snapshot" class="action-btn">📷 Copy Link</button>
-          <label>Team View: 
-            <select id="team-view">
-              <option value="">Global</option>
-            </select>
-          </label>
-          <label><input type="checkbox" id="sfxToggle"> 🔊 SFX</label>
+        <div class="controls-grid">
+          <!-- Primary Controls -->
+          <div class="control-row">
+            <div class="control-section">
+              <button id="play">▶️ Play</button>
+              <button id="pause">⏸️ Pause</button>
+            </div>
+            
+            <div class="control-section">
+              <button id="slower" class="speed-btn">Slower</button>
+              <span id="speed-display" style="color: #60a5fa; font-weight: 600; min-width: 50px; text-align: center;">1.0x</span>
+              <button id="faster" class="speed-btn">Faster</button>
+            </div>
+            
+            <div class="timeline-container">
+              <div class="timeline-events" id="timeline-events"></div>
+              <input type="range" id="slider" min="0" value="0">
+            </div>
+          </div>
+          
+          <!-- Navigation Controls -->
+          <div class="control-row">
+            <div class="control-section">
+              <button id="back5" class="nav-btn">⏮ -5</button>
+              <button id="back1" class="nav-btn">◀ -1</button>
+              <button id="fwd1" class="nav-btn">+1 ▶</button>
+              <button id="fwd5" class="nav-btn">+5 ⏭</button>
+            </div>
+            
+            <div class="control-section">
+              <button id="prevEvent" class="action-btn">Prev Event</button>
+              <button id="nextEvent" class="action-btn">Next Event</button>
+            </div>
+            
+            <div class="control-section">
+              <button id="bookmark" class="action-btn">📌 Bookmark</button>
+              <button id="snapshot" class="action-btn">📷 Copy Link</button>
+            </div>
+          </div>
+          
+          <!-- Settings & Options -->
+          <div class="control-row">
+            <div class="control-section">
+              <button id="reverse" class="action-btn">🔄 Reverse</button>
+              <button id="loop" class="action-btn">🔁 Loop</button>
+            </div>
+            
+            <div class="control-section">
+              <label>Team View:</label>
+              <select id="team-view">
+                <option value="">Global</option>
+              </select>
+            </div>
+            
+            <div class="control-section">
+              <label><input type="checkbox" id="sfxToggle"> 🔊 SFX</label>
+              <label><input type="checkbox" id="heatmapToggle"> 🔥 Heatmap</label>
+              <label><input type="checkbox" id="followToggle"> 📹 Follow Bot</label>
+            </div>
+          </div>
+          
+          <!-- Bookmarks -->
+          <div class="control-row" id="bookmarks-row" style="display: none;">
+            <span id="bookmarks"></span>
+          </div>
         </div>
       </div>
       
@@ -758,14 +920,18 @@
 
     const GRID_CANVAS = document.getElementById('grid');
     const ctx = GRID_CANVAS.getContext('2d');
+    const HP_CHART_CANVAS = document.getElementById('hp-chart');
+    const hpChartCtx = HP_CHART_CANVAS.getContext('2d');
     let gridSize = 10; // default; will update after metadata fetch
     const cellPixels = () => GRID_CANVAS.width / gridSize;
 
     let frames = [];
+    let MAP_SPEC = null; // {name, seed, size, static_walls, terrain, zones}
     let tick = 0;
     let playing = false;
     let timer = null;
     let interval = 500; // ms, adjusted by speed buttons
+    let speedMultiplier = 1.0; // speed multiplier for new controls
     let lastHP = {};
     let reverseMode = false;
     let selectedBotId = null;
@@ -783,6 +949,29 @@
     let visibleCells = null; // for fog-of-war
     let lastMouse = null;
     let summaryDamageByBot = {};
+    let heatmapData = {}; // {x,y: intensity}
+    let showHeatmap = false;
+    let loopMode = false;
+    let bookmarks = []; // array of turn numbers
+    let followMode = false;
+    let cameraOffset = { x: 0, y: 0 };
+    let lastFollowedBot = null;
+
+    // Responsively size the canvas to fill the center column width and stay square
+    function resizeCanvas(){
+      try{
+        const col = GRID_CANVAS.parentElement;
+        if (!col) return;
+        const colWidth = Math.max(200, Math.floor(col.clientWidth));
+        const size = colWidth; // square canvas in the column
+        GRID_CANVAS.style.width = size + 'px';
+        GRID_CANVAS.style.height = size + 'px';
+        GRID_CANVAS.width = size;
+        GRID_CANVAS.height = size;
+        render();
+      }catch(e){}
+    }
+    window.addEventListener('resize', ()=>{ resizeCanvas(); });
 
     // Global tooltip helper for canvas hover (used by event handlers)
     function maybeShowTooltip(){
@@ -979,8 +1168,20 @@
     const legendDiv = document.getElementById('legend');
     async function renderLegend(){
       if (!META_BY_CODE || Object.keys(META_BY_CODE).length===0) await loadComponentMeta();
-      legendDiv.innerHTML = Object.values(META_BY_CODE)
-        .map(c=>`<span class="legend-item">${c.emoji} – ${c.name}</span>`).join('');
+      const comps = Object.values(META_BY_CODE)
+        .map(c=>`<span class=\"legend-item\">${c.emoji} – ${c.name}</span>`).join('');
+      // Use color swatches for terrain to match the canvas rendering (less clutter than emojis)
+      const mapBits = `
+        <span class=\"legend-item\"><span class=\"legend-swatch\" style=\"background: rgba(100,116,139,0.7)\"></span> Walls</span>
+        <span class=\"legend-item\"><span class=\"legend-swatch\" style=\"background: rgba(34,197,94,0.25)\"></span> Forest (blocks LoS)</span>
+        <span class=\"legend-item\"><span class=\"legend-swatch\" style=\"background: rgba(120,72,0,0.28)\"></span> Swamp (slows next turn)</span>
+        <span class=\"legend-item\"><span class=\"legend-swatch\" style=\"background: rgba(59,130,246,0.22)\"></span> Ice (slides on move)</span>
+        <span class=\"legend-item\"><span class=\"legend-swatch\" style=\"background: rgba(37,99,235,0.35)\"></span> Water (impassable)</span>
+        <span class=\"legend-item\">💚 – Heal zone</span>
+        <span class=\"legend-item\">💀 – Damage zone</span>
+        <span class=\"legend-item\">⚡ – Boost zone</span>
+        <span class=\"legend-item\">✨ – Teleport zone</span>`;
+      legendDiv.innerHTML = comps + mapBits;
     }
     renderLegend();
 
@@ -1000,11 +1201,33 @@
       }
     }
 
-    document.getElementById('play').onclick = () => { playing = true; animStart = performance.now(); if(!rafId) rafId=requestAnimationFrame(step); };
+    document.getElementById('play').onclick = () => { 
+      playing = true; 
+      animStart = performance.now(); 
+      // Resume SFX when playing again
+      if (sfxEnabled && audioCtx && audioCtx.state === 'suspended') {
+        try {
+          audioCtx.resume();
+        } catch(e) {}
+      }
+      if(!rafId) rafId=requestAnimationFrame(step); 
+    };
     document.getElementById('pause').onclick = () => { playing = false; };
-    document.getElementById('speed1').onclick = ()=>{ interval=500; tickMs=600; };
-    document.getElementById('speed2').onclick = ()=>{ interval=250; tickMs=350; };
-    document.getElementById('speed4').onclick = ()=>{ interval=125; tickMs=200; };
+    function updateSpeed() {
+      interval = Math.max(1, Math.round(500 / speedMultiplier));
+      tickMs = Math.max(1, Math.round(600 / speedMultiplier));
+      document.getElementById('speed-display').textContent = speedMultiplier.toFixed(1) + 'x';
+    }
+    
+    document.getElementById('slower').onclick = () => {
+      speedMultiplier = Math.max(0.5, speedMultiplier - 0.5);
+      updateSpeed();
+    };
+    
+    document.getElementById('faster').onclick = () => {
+      speedMultiplier = Math.min(16.0, speedMultiplier + 0.5);
+      updateSpeed();
+    };
     document.getElementById('back1').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.max(0,tick-1); render(); };
     document.getElementById('back5').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.max(0,tick-5); render(); };
     document.getElementById('fwd1').onclick = ()=>{ playing=false; clearTimeout(timer); tick=Math.min(frames.length-1,tick+1); render(); };
@@ -1037,11 +1260,31 @@
       controlGroups[1].appendChild(btnPlayEvents);
     }
     document.getElementById('reverse').onclick = ()=>{ reverseMode = !reverseMode; };
+    document.getElementById('loop').onclick = ()=>{ loopMode = !loopMode; document.getElementById('loop').style.opacity = loopMode ? '1' : '0.7'; };
+    document.getElementById('bookmark').onclick = ()=>{ 
+      if (!bookmarks.includes(tick)) {
+        bookmarks.push(tick);
+        bookmarks.sort((a,b) => a - b);
+        renderBookmarks();
+      }
+    };
     document.getElementById('snapshot').onclick = ()=>{
       const url = `${location.origin}${location.pathname}?id=${encodeURIComponent(matchId)}&turn=${tick}`;
       navigator.clipboard.writeText(url).then(()=>{ alert('Snapshot link copied!'); });
     };
     document.getElementById('sfxToggle').onchange = (e)=>{ sfxEnabled = e.target.checked; if (sfxEnabled) { initAudio(); sfx('shield'); } };
+    document.getElementById('heatmapToggle').onchange = (e)=>{ showHeatmap = e.target.checked; render(); };
+    document.getElementById('followToggle').onchange = (e)=>{ 
+      followMode = e.target.checked; 
+      if (!followMode) {
+        cameraOffset = {x:0, y:0};
+        lastFollowedBot = null;
+      } else {
+        // When enabling follow mode, reset tracking so camera moves to selected bot
+        lastFollowedBot = null;
+      }
+      render(); 
+    };
     document.getElementById('pinSelected').onchange = (e)=>{ render(); };
     // Tabs
     document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -1051,6 +1294,8 @@
         const tab = btn.dataset.tab;
         document.getElementById('tab-stats').style.display = tab==='stats' ? '' : 'none';
         document.getElementById('tab-inspect').style.display = tab==='inspect' ? '' : 'none';
+        document.getElementById('tab-charts').style.display = tab==='charts' ? '' : 'none';
+        if (tab === 'charts') drawHPChart();
       };
     });
     // Inspector auto-follows current turn
@@ -1061,38 +1306,154 @@
       const obs = frame?.observations?.[bid];
       const pre = document.getElementById('inspect-output');
       if (pre) pre.textContent = obs ? JSON.stringify(obs, null, 2) : 'No observation available';
+      if (!obs && MAP_SPEC && pre){
+        const summary = {
+          map: {
+            name: MAP_SPEC.name,
+            seed: MAP_SPEC.seed,
+            size: MAP_SPEC.size,
+            terrain_counts: (MAP_SPEC.terrain||[]).reduce((acc,t)=>{ acc[t.type]=(acc[t.type]||0)+1; return acc; },{}),
+            zone_counts: (MAP_SPEC.zones||[]).reduce((acc,z)=>{ acc[z.type]=(acc[z.type]||0)+1; return acc; },{}),
+            static_walls: (MAP_SPEC.static_walls||[]).length
+          }
+        };
+        pre.textContent = JSON.stringify(summary, null, 2);
+      }
     }
     const botSelEl = document.getElementById('inspect-bot');
-    if (botSelEl){ botSelEl.onchange = updateInspector; }
+    if (botSelEl){ 
+      botSelEl.onchange = () => {
+        selectedBotId = botSelEl.value;
+        // In follow mode, let the camera smoothly transition to the new bot
+        // (don't reset camera offset, let updateCameraOffset handle the transition)
+        updateInspector();
+        render();
+      };
+    }
     // end panel close
     document.getElementById('close-end').onclick = ()=>{ document.getElementById('end-panel').style.display='none'; };
 
     async function fetchLog(logPath) {
       const res = await fetch(logPath);
       frames = await res.json();
-      // infer grid size if not set by metadata
-      let maxCoord = 0;
-      frames.forEach(f => {
-        if (!f || f.summary || !f.positions) return;
-        Object.values(f.positions).forEach(([x, y]) => { maxCoord = Math.max(maxCoord, x, y); });
-      });
-      gridSize = maxCoord >= 10 ? 15 : 10;
+      if (frames.length && frames[0] && frames[0].map){
+        MAP_SPEC = frames[0].map;
+        frames.shift();
+        const sizeObj = MAP_SPEC.size || {};
+        const anySize = sizeObj.duo || sizeObj.quad || sizeObj.both;
+        if (Array.isArray(anySize)) gridSize = anySize[0];
+      } else {
+        // infer grid size if not set by metadata
+        let maxCoord = 0;
+        frames.forEach(f => {
+          if (!f || f.summary || !f.positions) return;
+          Object.values(f.positions).forEach(([x, y]) => { maxCoord = Math.max(maxCoord, x, y); });
+        });
+        gridSize = maxCoord >= 10 ? 15 : 10;
+      }
+    }
+
+    function updateCameraOffset() {
+      if (!followMode || !selectedBotId) {
+        cameraOffset = { x: 0, y: 0 };
+        lastFollowedBot = null;
+        return;
+      }
+      
+      const frame = frames[tick];
+      if (!frame || !frame.positions[selectedBotId]) return;
+      
+      const [botX, botY] = frame.positions[selectedBotId];
+      const px = cellPixels();
+      const centerX = GRID_CANVAS.width / 2;
+      const centerY = GRID_CANVAS.height / 2;
+      
+      // Calculate offset to center the bot
+      const targetOffsetX = centerX - (botX + 0.5) * px;
+      const targetOffsetY = centerY - (botY + 0.5) * px;
+      
+      // Check if we switched to a new bot
+      const botChanged = lastFollowedBot !== selectedBotId;
+      if (botChanged) {
+        lastFollowedBot = selectedBotId;
+      }
+      
+      // Use faster interpolation when switching bots, slower for following
+      const interpolationSpeed = botChanged ? 0.6 : 0.15;
+      
+      // Smooth camera movement
+      const oldX = cameraOffset.x;
+      const oldY = cameraOffset.y;
+      cameraOffset.x = lerp(cameraOffset.x, targetOffsetX, interpolationSpeed);
+      cameraOffset.y = lerp(cameraOffset.y, targetOffsetY, interpolationSpeed);
+      
+      // Continue rendering if camera is still moving
+      const isMoving = Math.abs(cameraOffset.x - targetOffsetX) > 1 || Math.abs(cameraOffset.y - targetOffsetY) > 1;
+      if (isMoving && (Math.abs(oldX - cameraOffset.x) > 0.1 || Math.abs(oldY - cameraOffset.y) > 0.1)) {
+        requestAnimationFrame(() => render());
+      }
     }
 
     function drawGrid() {
       ctx.clearRect(0, 0, GRID_CANVAS.width, GRID_CANVAS.height);
       const px = cellPixels();
+      
+      ctx.save();
+      if (followMode) {
+        updateCameraOffset();
+        ctx.translate(cameraOffset.x, cameraOffset.y);
+      }
+      
       ctx.strokeStyle = '#ccc';
       for (let i = 0; i <= gridSize; i++) {
         ctx.beginPath();
         ctx.moveTo(i * px, 0);
-        ctx.lineTo(i * px, GRID_CANVAS.height);
+        ctx.lineTo(i * px, gridSize * px);
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(0, i * px);
-        ctx.lineTo(GRID_CANVAS.width, i * px);
+        ctx.lineTo(gridSize * px, i * px);
         ctx.stroke();
       }
+      
+      ctx.restore();
+    }
+
+    function drawMapLayers(){
+      if (!MAP_SPEC) return;
+      
+      ctx.save();
+      if (followMode) {
+        ctx.translate(cameraOffset.x, cameraOffset.y);
+      }
+      
+      const px = cellPixels();
+      // terrain tints
+      const tint = {
+        forest: 'rgba(34,197,94,0.25)',
+        swamp: 'rgba(120,72,0,0.28)',
+        ice: 'rgba(59,130,246,0.22)',
+        water: 'rgba(37,99,235,0.35)'
+      };
+      for (const t of (MAP_SPEC.terrain||[])){
+        const pos = Array.isArray(t.pos)? t.pos : t.pos;
+        const [x,y] = pos;
+        ctx.fillStyle = tint[t.type] || 'rgba(0,0,0,0)';
+        ctx.fillRect(x*px, y*px, px, px);
+      }
+      // zones icons
+      ctx.font = `${Math.max(12, px*0.6)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const icon = { heal:'💚', damage:'💀', boost:'⚡', teleport:'✨' };
+      for (const z of (MAP_SPEC.zones||[])){
+        const pos = Array.isArray(z.pos)? z.pos : z.pos;
+        const [x,y] = pos;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(icon[z.type] || '?', (x+0.5)*px, (y+0.5)*px);
+      }
+      
+      ctx.restore();
     }
 
     function drawBots(frame) {
@@ -1105,6 +1466,9 @@
       }
       ctx.save();
       ctx.translate(shakeX, shakeY);
+      if (followMode) {
+        ctx.translate(cameraOffset.x, cameraOffset.y);
+      }
       // choose deterministic color per team
       const teamColors = {};
       let colorIdx = 0;
@@ -1280,6 +1644,15 @@
         const px=cellPixels();
         const s = frame.structures || {};
         const tNow = performance.now();
+        // static walls from map header (draw first so player-built overlay looks the same)
+        const staticWalls = (MAP_SPEC && MAP_SPEC.static_walls) ? MAP_SPEC.static_walls : [];
+        staticWalls.forEach(([x,y])=>{
+          const pulse = 0.90 + 0.08*Math.sin(tNow/430 + (x+y));
+          ctx.fillStyle = `rgba(100,116,139,${pulse})`;
+          ctx.fillRect(x*px+2, y*px+2, px-4, px-4);
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.fillRect(x*px+px*0.25, y*px+px*0.45, px*0.5, 2);
+        });
         // walls: subtle pulse
         (s.walls||[]).forEach(([x,y,team])=>{
           const pulse = 0.85 + 0.1*Math.sin(tNow/400 + (x+y));
@@ -1378,6 +1751,54 @@
           }
         });
       }
+      // zone VFX from event strings this tick
+      if (frame.events){
+        const zre = /(💚|💀|⚡|✨) (Zone heal|Zone damage|Zone boost|Teleport) at \[(\d+),(\d+)\](?:.*\[(\d+),(\d+)\])?/;
+        const pre = /Zone ready: (heal|damage|boost|teleport) at \[(\d+),(\d+)\]/i;
+        frame.events.forEach(ev=>{
+          const m = ev.match(zre);
+          if (!m) return;
+          const icon = m[1];
+          const zx = parseInt(m[3],10), zy = parseInt(m[4],10);
+          const pxs = cellPixels();
+          const cx = (zx+0.5)*pxs, cy=(zy+0.5)*pxs;
+          if (icon==='💚'){
+            // pulsing green ring
+            ctx.save(); ctx.strokeStyle='rgba(34,197,94,0.85)'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(cx,cy,pxs*0.45,0,Math.PI*2); ctx.stroke(); ctx.restore();
+            if (sfxEnabled) sfx('shield');
+          } else if (icon==='💀'){
+            ctx.save(); ctx.strokeStyle='rgba(239,68,68,0.9)'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(cx,cy,pxs*0.45,0,Math.PI*2); ctx.stroke(); ctx.restore();
+            if (sfxEnabled) sfx('attack');
+          } else if (icon==='⚡'){
+            ctx.save(); ctx.strokeStyle='rgba(234,179,8,0.9)'; ctx.setLineDash([6,4]); ctx.lineWidth=3; ctx.beginPath(); ctx.arc(cx,cy,pxs*0.45,0,Math.PI*2); ctx.stroke(); ctx.restore();
+          } else if (icon==='✨'){
+            // draw both from and to if present
+            ctx.save(); ctx.strokeStyle='rgba(168,85,247,0.9)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(cx,cy,pxs*0.45,0,Math.PI*2); ctx.stroke(); ctx.restore();
+            const tx = m[5]!=null? parseInt(m[5],10): null; const ty = m[6]!=null? parseInt(m[6],10): null;
+            if (tx!=null && ty!=null){
+              const txp=(tx+0.5)*pxs, typ=(ty+0.5)*pxs;
+              const grad = ctx.createLinearGradient(cx,cy,txp,typ);
+              grad.addColorStop(0,'rgba(168,85,247,0.0)'); grad.addColorStop(0.5,'rgba(168,85,247,0.9)'); grad.addColorStop(1,'rgba(168,85,247,0.0)');
+              ctx.strokeStyle=grad; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(txp,typ); ctx.stroke();
+              if (sfxEnabled) sfx('snipe');
+            }
+          }
+        });
+        // power-up preview subtle glow
+        frame.events.forEach(ev=>{
+          const mm = ev.match(pre);
+          if (!mm) return;
+          const kind = mm[1].toLowerCase();
+          const zx = parseInt(mm[2],10), zy = parseInt(mm[3],10);
+          const pxs = cellPixels();
+          const cx = (zx+0.5)*pxs, cy=(zy+0.5)*pxs;
+          ctx.save();
+          const color = kind==='heal' ? 'rgba(34,197,94,0.35)' : kind==='damage' ? 'rgba(239,68,68,0.35)' : kind==='boost' ? 'rgba(234,179,8,0.35)' : 'rgba(168,85,247,0.35)';
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(cx,cy,pxs*0.35,0,Math.PI*2); ctx.fill();
+          ctx.restore();
+        });
+      }
       // particles
       const nowp = performance.now();
       particles = particles.filter(p=> p.life > 0);
@@ -1404,13 +1825,87 @@
       }
     }
 
+    function buildHeatmapData() {
+      heatmapData = {};
+      
+      frames.forEach((frame, idx) => {
+        // Count actions at each position
+        if (frame.actions) {
+          Object.entries(frame.actions).forEach(([botId, action]) => {
+            const pos = frame.positions?.[botId];
+            if (!pos) return;
+            
+            const [x, y] = pos;
+            const key = `${x},${y}`;
+            heatmapData[key] = (heatmapData[key] || 0) + 1;
+            
+            // Add extra intensity for combat actions
+            if (['attack', 'snipe', 'explode'].includes(action.type)) {
+              heatmapData[key] = (heatmapData[key] || 0) + 2;
+            }
+          });
+        }
+        
+        // Count eliminations
+        const events = frame.events || [];
+        events.forEach(event => {
+          if (event.includes('☠️')) {
+            // Extract position if possible from log format
+            const posMatch = event.match(/at \[(\d+),(\d+)\]/);
+            if (posMatch) {
+              const x = parseInt(posMatch[1], 10);
+              const y = parseInt(posMatch[2], 10);
+              const key = `${x},${y}`;
+              heatmapData[key] = (heatmapData[key] || 0) + 5; // High intensity for deaths
+            }
+          }
+        });
+      });
+    }
+
+    function drawHeatmap() {
+      if (!showHeatmap) return;
+      
+      ctx.save();
+      if (followMode) {
+        ctx.translate(cameraOffset.x, cameraOffset.y);
+      }
+      
+      const px = cellPixels();
+      const maxIntensity = Math.max(1, ...Object.values(heatmapData));
+      
+      for (const [key, intensity] of Object.entries(heatmapData)) {
+        const [x, y] = key.split(',').map(Number);
+        const alpha = Math.min(0.7, intensity / maxIntensity);
+        
+        // Create heat gradient from cool (blue) to hot (red)
+        let color;
+        if (intensity < maxIntensity * 0.3) {
+          color = `rgba(59, 130, 246, ${alpha * 0.4})`; // Cool blue
+        } else if (intensity < maxIntensity * 0.7) {
+          color = `rgba(245, 158, 11, ${alpha * 0.6})`; // Warm yellow
+        } else {
+          color = `rgba(239, 68, 68, ${alpha * 0.8})`; // Hot red
+        }
+        
+        ctx.fillStyle = color;
+        ctx.fillRect(x * px, y * px, px, px);
+      }
+      ctx.restore();
+    }
+
+
+
     function render() {
       drawGrid();
+      drawMapLayers();
+      drawHeatmap();
       const frame = frames[tick];
       if (frame) {
         drawBots(frame);
         document.getElementById('info').innerHTML = `<span style="background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px;">Turn ${frame.turn+1}/${frames.length}</span>`;
         document.getElementById('slider').value=tick;
+        highlightCurrentLogTurn();
         // update bot info panel if selected
         if (selectedBotId) {
           const hp = frame.hp?.[selectedBotId] ?? '-';
@@ -1448,6 +1943,10 @@
           div.innerHTML=''; div.appendChild(frag);
         }
         updateInspector();
+        // Update chart if it's currently visible
+        if (document.getElementById('tab-charts').style.display !== 'none') {
+          drawHPChart();
+        }
       }
     }
 
@@ -1481,12 +1980,39 @@
               if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { found=true; break; }
               i++;
             }
-            if (!found){ playing=false; showEndPanel(); return; } else { tick = i; }
+            if (!found){ 
+              playing=false; 
+              // Stop SFX when match ends in events mode
+              if (sfxEnabled && audioCtx) {
+                try {
+                  audioCtx.suspend();
+                } catch(e) {}
+              }
+              showEndPanel(); 
+              return; 
+            } else { tick = i; }
           }
           animStart = ts;
           // stop and show end-panel if reached last frame and not looping
           if (!reverseMode && tick === frames.length-1){
-            playing = false; showEndPanel();
+            if (loopMode) {
+              tick = 0; // restart from beginning
+              // Resume SFX when looping
+              if (sfxEnabled && audioCtx && audioCtx.state === 'suspended') {
+                try {
+                  audioCtx.resume();
+                } catch(e) {}
+              }
+            } else {
+              playing = false; 
+              // Stop SFX when match ends
+              if (sfxEnabled && audioCtx) {
+                try {
+                  audioCtx.suspend();
+                } catch(e) {}
+              }
+              showEndPanel();
+            }
           }
           // show elimination toast
           const f2 = frames[tick];
@@ -1517,6 +2043,7 @@
       frames.forEach((f, idx) => {
         const container = document.createElement('div');
         container.className = 'log-turn';
+        container.id = `log-turn-${idx}`;
         const title = document.createElement('div');
         title.innerHTML = `<strong>Turn ${idx+1}</strong>`;
         container.appendChild(title);
@@ -1549,11 +2076,34 @@
       logDiv.appendChild(frag);
     }
 
+    function highlightCurrentLogTurn(){
+      const logDiv = document.getElementById('log');
+      if (!logDiv) return;
+      const prev = logDiv.querySelector('.log-turn.highlight');
+      if (prev) prev.classList.remove('highlight');
+      const el = document.getElementById(`log-turn-${tick}`);
+      if (!el) return;
+      el.classList.add('highlight');
+      // Auto-scroll to keep current turn visible
+      const top = el.offsetTop;
+      const bottom = top + el.offsetHeight;
+      const viewTop = logDiv.scrollTop;
+      const viewBottom = viewTop + logDiv.clientHeight;
+      if (top < viewTop) {
+        logDiv.scrollTo({ top: Math.max(0, top - 12), behavior: 'smooth' });
+      } else if (bottom > viewBottom) {
+        logDiv.scrollTo({ top: bottom - logDiv.clientHeight + 12, behavior: 'smooth' });
+      }
+    }
+
     function nearestBotIdAtCanvas(x, y) {
       const rect = GRID_CANVAS.getBoundingClientRect();
       const cx = x - rect.left; const cy = y - rect.top;
       const px = cellPixels();
-      const fx = cx / px - 0.5; const fy = cy / px - 0.5;
+      // Adjust for camera offset in follow mode so hit-testing aligns with drawn positions
+      const adjCx = followMode ? (cx - cameraOffset.x) : cx;
+      const adjCy = followMode ? (cy - cameraOffset.y) : cy;
+      const fx = adjCx / px - 0.5; const fy = adjCy / px - 0.5;
       const frame = frames[tick];
       let best=null, bestd=1e9;
       for (const [bid, pos] of Object.entries(frame.positions)){
@@ -1572,6 +2122,8 @@
         selectedBotId = bid;
         const botSel = document.getElementById('inspect-bot');
         if (botSel) botSel.value = bid;
+        // In follow mode, let the camera smoothly transition to the new bot
+        // (don't reset camera offset, let updateCameraOffset handle the transition)
         render();
         updateInspector();
       }
@@ -1583,6 +2135,8 @@
     GRID_CANVAS.addEventListener('mouseout', ()=>{
       document.getElementById('tooltip').style.display = 'none';
     });
+    
+
 
     function renderBotStats(){
       const div = document.getElementById('bot-stats');
@@ -1618,6 +2172,172 @@
       document.getElementById('end-panel').style.display='flex';
     }
 
+    function drawHPChart() {
+      if (!frames.length) return;
+      
+      hpChartCtx.clearRect(0, 0, HP_CHART_CANVAS.width, HP_CHART_CANVAS.height);
+      
+      const padding = 40;
+      const chartWidth = HP_CHART_CANVAS.width - 2 * padding;
+      const chartHeight = HP_CHART_CANVAS.height - 2 * padding;
+      
+      // Get all bot IDs from first frame
+      const botIds = Object.keys(frames[0]?.positions || {});
+      if (!botIds.length) return;
+      
+      // Team colors
+      const teamColors = {};
+      let colorIdx = 0;
+      botIds.forEach(botId => {
+        const teamId = botId.split('-')[0];
+        if (!teamColors[teamId]) {
+          const palette = ['#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c'];
+          teamColors[teamId] = palette[colorIdx % palette.length];
+          colorIdx++;
+        }
+      });
+      
+      // Draw axes
+      hpChartCtx.strokeStyle = '#475569';
+      hpChartCtx.lineWidth = 1;
+      hpChartCtx.beginPath();
+      hpChartCtx.moveTo(padding, padding);
+      hpChartCtx.lineTo(padding, padding + chartHeight);
+      hpChartCtx.lineTo(padding + chartWidth, padding + chartHeight);
+      hpChartCtx.stroke();
+      
+      // Draw grid lines
+      hpChartCtx.strokeStyle = '#334155';
+      hpChartCtx.lineWidth = 0.5;
+      for (let i = 0; i <= 10; i++) {
+        const y = padding + (i / 10) * chartHeight;
+        hpChartCtx.beginPath();
+        hpChartCtx.moveTo(padding, y);
+        hpChartCtx.lineTo(padding + chartWidth, y);
+        hpChartCtx.stroke();
+      }
+      
+      // Draw HP lines for each bot
+      botIds.forEach(botId => {
+        const teamId = botId.split('-')[0];
+        hpChartCtx.strokeStyle = teamColors[teamId];
+        hpChartCtx.lineWidth = selectedBotId === botId ? 3 : 1.5;
+        hpChartCtx.globalAlpha = selectedBotId === botId ? 1 : 0.7;
+        
+        hpChartCtx.beginPath();
+        let started = false;
+        
+        frames.forEach((frame, idx) => {
+          const hp = frame.hp?.[botId];
+          if (typeof hp === 'number') {
+            const x = padding + (idx / (frames.length - 1)) * chartWidth;
+            const y = padding + chartHeight - (hp / 100) * chartHeight;
+            
+            if (!started) {
+              hpChartCtx.moveTo(x, y);
+              started = true;
+            } else {
+              hpChartCtx.lineTo(x, y);
+            }
+          }
+        });
+        
+        hpChartCtx.stroke();
+        hpChartCtx.globalAlpha = 1;
+      });
+      
+      // Draw current time indicator
+      const currentX = padding + (tick / (frames.length - 1)) * chartWidth;
+      hpChartCtx.strokeStyle = '#22c55e';
+      hpChartCtx.lineWidth = 2;
+      hpChartCtx.beginPath();
+      hpChartCtx.moveTo(currentX, padding);
+      hpChartCtx.lineTo(currentX, padding + chartHeight);
+      hpChartCtx.stroke();
+      
+      // Draw labels
+      hpChartCtx.fillStyle = '#e2e8f0';
+      hpChartCtx.font = '12px Inter, sans-serif';
+      hpChartCtx.textAlign = 'center';
+      hpChartCtx.fillText('Turn', padding + chartWidth / 2, HP_CHART_CANVAS.height - 10);
+      
+      hpChartCtx.save();
+      hpChartCtx.translate(15, padding + chartHeight / 2);
+      hpChartCtx.rotate(-Math.PI / 2);
+      hpChartCtx.fillText('HP', 0, 0);
+      hpChartCtx.restore();
+    }
+
+    function renderBookmarks() {
+      const container = document.getElementById('bookmarks');
+      const bookmarksRow = document.getElementById('bookmarks-row');
+      container.innerHTML = '';
+      
+      if (bookmarks.length === 0) {
+        bookmarksRow.style.display = 'none';
+        return;
+      }
+      
+      bookmarksRow.style.display = 'flex';
+      
+      bookmarks.forEach((turn, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'bookmark-btn';
+        btn.textContent = `T${turn + 1}`;
+        btn.title = `Jump to Turn ${turn + 1}`;
+        btn.onclick = () => {
+          playing = false;
+          tick = turn;
+          animStart = performance.now();
+          render();
+        };
+        
+        // Add remove functionality with right-click
+        btn.oncontextmenu = (e) => {
+          e.preventDefault();
+          bookmarks.splice(idx, 1);
+          renderBookmarks();
+        };
+        
+        container.appendChild(btn);
+      });
+    }
+
+    function buildTimelineEvents() {
+      const timelineEl = document.getElementById('timeline-events');
+      timelineEl.innerHTML = '';
+      
+      frames.forEach((frame, idx) => {
+        const events = frame.events || [];
+        let hasEvent = false;
+        let eventType = '';
+        
+        // Prioritize event types (death > explosion > snipe > shield)
+        if (events.some(e => e.includes('☠️'))) {
+          eventType = 'death';
+          hasEvent = true;
+        } else if (events.some(e => e.includes('💣'))) {
+          eventType = 'explosion';
+          hasEvent = true;
+        } else if (events.some(e => e.includes('🎯'))) {
+          eventType = 'snipe';
+          hasEvent = true;
+        } else if (events.some(e => e.includes('🛡'))) {
+          eventType = 'shield';
+          hasEvent = true;
+        }
+        
+        if (hasEvent) {
+          const marker = document.createElement('div');
+          marker.className = `timeline-event ${eventType}`;
+          const position = (idx / (frames.length - 1)) * 100;
+          marker.style.left = `${position}%`;
+          marker.title = `Turn ${idx + 1}: ${eventType}`;
+          timelineEl.appendChild(marker);
+        }
+      });
+    }
+
     (async function init() {
       try {
         const metaRes = await fetch(`http://localhost:8000/matches/${matchId}`);
@@ -1642,6 +2362,10 @@
         if (frames[frames.length-1]?.summary){ summaryDamageByBot = frames[frames.length-1].damage_by_bot || {}; frames.pop(); }
         // set slider max after removing summary
         document.getElementById('slider').max = frames.length-1;
+        // build timeline events
+        buildTimelineEvents();
+        // build heatmap data
+        buildHeatmapData();
         // build bot stats
         renderBotStats();
         // slider drag handler
@@ -1678,6 +2402,8 @@
         updateInspector();
         drawGrid();
         document.getElementById('info').innerHTML = '<span style="background:rgba(0,0,0,0.3); padding:4px 8px; border-radius:4px;">✅ Loaded. Press Play.</span>';
+        // ensure canvas fits column on first load
+        resizeCanvas();
         // kick off RAF
         if (!rafId) rafId=requestAnimationFrame(step);
         // start banner

@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ from .engine import (
     Position,
     TURN_LIMIT,
 )
+from .maps import generate_map, load_rules
 
 
 def safe_position_from_dict(target_dict: dict, grid_size: int) -> "Position":
@@ -133,8 +135,13 @@ class _SandboxManager:
             def within4(x, y):
                 return max(abs(x - bot.position.x), abs(y - bot.position.y)) <= 4
             visible_walls = [[w.x, w.y] for w in state.walls if within4(w.x, w.y)]
+            # include static walls as separate list
+            visible_static_walls = [[sx, sy] for (sx, sy) in state.static_walls if within4(sx, sy)]
             visible_decoys = [[d.x, d.y, d.team_id] for d in state.decoys if within4(d.x, d.y)]
             visible_traps = [[t.x, t.y, t.team_id] for t in state.traps if t.team_id == bot.team_id and within4(t.x, t.y)]
+            # Visible terrain and zones (type included)
+            visible_terrain = [[x, y, t] for (x, y), t in state.terrain.items() if within4(x, y)]
+            visible_zones = [[x, y, zs] for (x, y), zs in state.zones.items() if within4(x, y)]
 
             obs = {
                 "turn": state.turn,
@@ -150,8 +157,11 @@ class _SandboxManager:
                 "visible_enemies": vis_enemies,
                 "visible_allies": vis_allies,
                 "visible_walls": visible_walls,
+                "visible_static_walls": visible_static_walls,
                 "visible_decoys": visible_decoys,
                 "visible_traps": visible_traps,
+                "visible_terrain": visible_terrain,
+                "visible_zones": visible_zones,
             }
             obs_map[bot.id] = obs
             action_dict = safe_decide(proxy, obs)
@@ -227,20 +237,27 @@ class _SandboxManager:
 # ---------------- Main simulation ----------------
 
 
-async def simulate_match(session: AsyncSession, team_ids: List[str]):
+async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int | None = None):
     mode = "duo" if len(team_ids) == 2 else "quad" if len(team_ids) == 4 else None
     if not mode:
         raise ValueError("Only 2 or 4 teams supported")
 
     teams_db = await _load_teams(session, team_ids)
 
-    # Build GameState
-    if mode == "duo":
-        grid_size = GRID_DUO
-        pos_lists = _spawn_positions_duo()
+    # Assign map seed and generate map from rules
+    seed = int(seed) if seed is not None else random.randint(1, 2**31 - 1)
+    rules = load_rules()
+    ms = generate_map(mode, seed, rules)
+    grid_size = ms.grid_size_for_mode(mode, GRID_DUO, GRID_QUAD)
+    # Build spawn positions list in engine format (list per team index)
+    if mode == "duo" and ms.spawn_positions and mode in ms.spawn_positions:
+        sp = ms.spawn_positions[mode]
+        pos_lists = [sp.get("teamA", _spawn_positions_duo()[0]), sp.get("teamB", _spawn_positions_duo()[1])]
+    elif mode == "quad" and ms.spawn_positions and mode in ms.spawn_positions:
+        sp = ms.spawn_positions[mode]
+        pos_lists = [sp.get("teamA"), sp.get("teamB"), sp.get("teamC"), sp.get("teamD")]
     else:
-        grid_size = GRID_QUAD
-        pos_lists = _spawn_positions_quad()
+        pos_lists = _spawn_positions_duo() if mode == "duo" else _spawn_positions_quad()
 
     engine_teams: List[Team] = []
     team_files: Dict[str, str] = {}
@@ -316,7 +333,19 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
         team_files[str(team_db.id)] = team_db.code_path
         bot_class_map[str(team_db.id)] = class_name_map
 
-    state = GameState(grid_size=grid_size, teams=engine_teams)
+    # Terrain/zones maps
+    terrain_map = {tuple(t.pos): t.type for t in ms.terrain}
+    zones_map: Dict[Tuple[int, int], List[str]] = {}
+    for z in ms.zones:
+        zones_map.setdefault(tuple(z.pos), []).append(z.type)
+
+    state = GameState(
+        grid_size=grid_size,
+        teams=engine_teams,
+        static_walls=[tuple(p) for p in ms.static_walls],
+        terrain=terrain_map,
+        zones=zones_map,
+    )
 
     log: List[dict] = []
     turn = 0
@@ -451,6 +480,42 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
         if trap_trigs:
             for x,y in trap_trigs:
                 events.append(f"🪤 Trap triggered at [{x},{y}]")
+        # zone power-up preview events (on tiles bots are standing on after movement)
+        for pu in getattr(engine, 'zone_powerups', []) or []:
+            zt, zx, zy, bid = pu
+            friendly = friendlyName = None
+            try:
+                team_prefix = bid.split('-')[0]
+                role_code = bid.split('-')[1]
+                team_name = next((t['name'] for t in teams_meta if t['prefix'] == team_prefix), team_prefix)
+                role_name = { 'sn':'Sniper','ta':'Tank','bo':'Bomber','sc':'Scout','te':'Teleporter','po':'Poisoner','ts':'Trap Setter','he':'Healer','sg':'Shield Giver','pu':'Puller','br':'Bruiser','ja':'Jammer','re':'Reflector','wb':'Wall Builder','ps':'Pusher','dc':'Decoy Caster','le':'Leaper','si':'Silencer'}.get(role_code, role_code)
+                friendly = f"{team_name} {role_name}"
+            except Exception:
+                friendly = bid
+            icon = {'heal':'💚','damage':'💀','boost':'⚡','teleport':'✨'}.get(zt, '🟩')
+            events.append(f"{icon} Zone ready: {zt} at [{zx},{zy}] for {friendly}")
+
+        # zone events to drive VFX/SFX in viewer
+        for ze in getattr(engine, 'zone_events', []) or []:
+            zt, zx, zy, bid, extra = ze
+            # friendly bot name
+            try:
+                team_prefix = bid.split('-')[0]
+                role_code = bid.split('-')[1]
+                team_name = next((t['name'] for t in teams_meta if t['prefix'] == team_prefix), team_prefix)
+                role_name = { 'sn':'Sniper','ta':'Tank','bo':'Bomber','sc':'Scout','te':'Teleporter','po':'Poisoner','ts':'Trap Setter','he':'Healer','sg':'Shield Giver','pu':'Puller','br':'Bruiser','ja':'Jammer','re':'Reflector','wb':'Wall Builder','ps':'Pusher','dc':'Decoy Caster','le':'Leaper','si':'Silencer'}.get(role_code, role_code)
+                friendly = f"{team_name} {role_name}"
+            except Exception:
+                friendly = bid
+            if zt == 'heal':
+                events.append(f"💚 Zone heal at [{zx},{zy}] for {friendly}")
+            elif zt == 'damage':
+                events.append(f"💀 Zone damage at [{zx},{zy}] to {friendly}")
+            elif zt == 'boost':
+                events.append(f"⚡ Zone boost at [{zx},{zy}] for {friendly}")
+            elif zt == 'teleport':
+                tx, ty = extra.get('to_x'), extra.get('to_y')
+                events.append(f"✨ Teleport at [{zx},{zy}] moved {friendly} to [{tx},{ty}]")
         log.append(
             {
                 "turn": turn,
@@ -487,7 +552,7 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
     for b in state.all_bots():
         final_hp[b.team_id] += b.hp
 
-    # Write log file
+    # Write log file (include map header at root)
     match_dir = DATA_DIR
     match_dir.mkdir(parents=True, exist_ok=True)
     log_filename = f"{uuid.uuid4()}.json"
@@ -497,7 +562,17 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
         "summary": True,
         "damage_by_bot": damage_by_bot_total,
     }
-    log_with_tail = log + [summary]
+    map_header = {
+        "map": {
+            "name": ms.name,
+            "seed": ms.seed,
+            "size": ms.size,
+            "static_walls": ms.static_walls,
+            "terrain": [{"type": t.type, "pos": list(t.pos)} for t in ms.terrain],
+            "zones": [{"type": z.type, "pos": list(z.pos)} for z in ms.zones],
+        }
+    }
+    log_with_tail = [map_header] + log + [summary]
     log_path.write_text(json.dumps(log_with_tail), encoding="utf-8")
 
     return {
@@ -507,6 +582,8 @@ async def simulate_match(session: AsyncSession, team_ids: List[str]):
         "team_hp": final_hp,
         "team_damage": damage_done_total,
         "damage_by_bot": damage_by_bot_total,
+        "map_name": ms.name,
+        "map_seed": int(ms.seed) if ms.seed is not None else None,
     }
 
 

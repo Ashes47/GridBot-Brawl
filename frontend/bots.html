@@ -6,21 +6,199 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="style.css">
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1200px; margin: 30px auto; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px,1fr)); gap: 16px; }
-    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; background:#fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .title { display:flex; align-items:center; gap:8px; font-size:20px; margin-bottom: 8px; }
-    .meta { font-size:12px; color:#64748b; margin-bottom:8px; }
-    .power-desc { font-size:14px; background:#f8fafc; padding:8px; border-radius:6px; margin-bottom:12px; border-left:3px solid #3b82f6; }
-    .section { margin: 12px 0 8px; font-weight:bold; font-size:14px; color:#1f2937; }
-    .content { font-size:13px; line-height:1.4; margin-bottom:8px; }
-    .synergy { background:#ecfdf5; padding:6px; border-radius:4px; border-left:3px solid #10b981; }
-    .counter { background:#fef2f2; padding:6px; border-radius:4px; border-left:3px solid #ef4444; }
-    .tips { background:#fffbeb; padding:6px; border-radius:4px; border-left:3px solid #f59e0b; }
-    code { background:#f3f4f6; padding:1px 4px; border-radius:4px; font-size:12px; }
-    .damage { color:#dc2626; font-weight:bold; }
-    .range { color:#2563eb; font-weight:bold; }
-    .cooldown { color:#7c3aed; font-weight:bold; }
+    body { 
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif; 
+      max-width: 1400px; 
+      margin: 20px auto; 
+      padding: 0 20px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+    
+    h1 {
+      text-align: center;
+      color: white;
+      text-shadow: 0 4px 8px rgba(0,0,0,0.4);
+      margin-bottom: 16px;
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+    
+    .intro {
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 1.1rem;
+      color: #cbd5e1;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .grid { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fill, minmax(380px,1fr)); 
+      gap: 20px; 
+      margin-bottom: 40px;
+    }
+    
+    .card { 
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      border-radius: 16px;
+      padding: 20px;
+      background: rgba(30, 41, 59, 0.8);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 48px rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    
+    .title { 
+      display: flex; 
+      align-items: center; 
+      gap: 12px; 
+      font-size: 22px; 
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+    
+    .meta { 
+      font-size: 13px; 
+      color: #94a3b8; 
+      margin-bottom: 16px;
+      padding: 8px 12px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    .power-desc { 
+      font-size: 15px; 
+      background: rgba(59, 130, 246, 0.1);
+      padding: 12px; 
+      border-radius: 8px; 
+      margin-bottom: 16px; 
+      border-left: 4px solid #3b82f6;
+      color: #e2e8f0;
+      line-height: 1.5;
+    }
+    
+    .section { 
+      margin: 16px 0 10px; 
+      font-weight: 700; 
+      font-size: 15px; 
+      color: #f1f5f9;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .content { 
+      font-size: 14px; 
+      line-height: 1.5; 
+      margin-bottom: 12px;
+      color: #cbd5e1;
+    }
+    
+    .synergy { 
+      background: rgba(16, 185, 129, 0.1);
+      padding: 10px; 
+      border-radius: 8px; 
+      border-left: 4px solid #10b981;
+      color: #a7f3d0;
+    }
+    
+    .counter { 
+      background: rgba(239, 68, 68, 0.1);
+      padding: 10px; 
+      border-radius: 8px; 
+      border-left: 4px solid #ef4444;
+      color: #fca5a5;
+    }
+    
+    .tips { 
+      background: rgba(245, 158, 11, 0.1);
+      padding: 10px; 
+      border-radius: 8px; 
+      border-left: 4px solid #f59e0b;
+      color: #fcd34d;
+    }
+    
+    code { 
+      background: rgba(15, 23, 42, 0.8);
+      color: #a78bfa;
+      padding: 2px 6px; 
+      border-radius: 4px; 
+      font-size: 13px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    .damage { color: #f87171; font-weight: 700; }
+    .range { color: #60a5fa; font-weight: 700; }
+    .cooldown { color: #a78bfa; font-weight: 700; }
+    
+    .role-badge {
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .compositions {
+      margin-top: 50px;
+      padding: 24px;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 16px;
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      backdrop-filter: blur(8px);
+    }
+    
+    .compositions h3 {
+      color: #f1f5f9;
+      margin-top: 0;
+      font-size: 1.5rem;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .comp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    
+    .comp-card {
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      border-left: 4px solid;
+    }
+    
+    .comp-card.balanced { border-left-color: #10b981; }
+    .comp-card.aggressive { border-left-color: #3b82f6; }
+    .comp-card.control { border-left-color: #8b5cf6; }
+    .comp-card.sustain { border-left-color: #f59e0b; }
+    
+    .comp-card strong {
+      color: #f1f5f9;
+      font-size: 16px;
+    }
+    
+    .comp-card small {
+      color: #94a3b8;
+      display: block;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -33,15 +211,18 @@
         <a href="signup.html">Signup</a>
         <a href="guide.html">Guide</a>
         <a href="bots.html">Bots</a>
+        <a href="maps.html">Maps</a>
       </nav>
     </div>
   </header>
 
   <h1>🤖 Complete Bot Guide & Strategies</h1>
-  <p>Master all 18 unique bots with detailed breakdowns of powers, positioning, synergies, and advanced tactics. Choose your 5-bot roster wisely!</p>
-
-  <div style="margin: 20px 0; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
-    <strong>💡 Core Mechanics:</strong> All bots have 100 HP, deal 20 base attack damage (except Bruiser: 30), and share vision radius of 4 tiles. Powers have cooldowns and can be silenced or jammed.
+  <div class="intro">
+    <p>Master all 18 unique bots with detailed breakdowns of powers, positioning, synergies, and advanced tactics. Choose your 5-bot roster wisely!</p>
+    
+    <div style="margin: 24px 0; padding: 16px; background: rgba(59, 130, 246, 0.1); border-radius: 12px; border-left: 4px solid #3b82f6; text-align: left;">
+      <strong style="color: #60a5fa;">💡 Core Mechanics:</strong> All bots have 100 HP, deal 20 base attack damage (except Bruiser: 30), and share vision radius of 4 tiles. Powers have cooldowns and can be silenced or jammed.
+    </div>
   </div>
 
   <div id="bots" class="grid"></div>
@@ -187,9 +368,9 @@
         div.className = 'card';
         div.innerHTML = `
           <div class="title">
-            <span style="font-size:24px;">${c.emoji}</span> 
+            <span style="font-size:28px;">${c.emoji}</span> 
             <strong>${c.name}</strong>
-            <span style="margin-left:auto; font-size:12px; background:${c.color}; color:white; padding:2px 6px; border-radius:12px;">${c.role}</span>
+            <span class="role-badge" style="background:${c.color}; margin-left:auto;">${c.role}</span>
           </div>
           <div class="meta">
             Key: <code>${c.key}</code> · 
@@ -199,19 +380,34 @@
           
           <div class="power-desc">${c.description}</div>
           
-          <div class="section">🎯 Strategy & Usage</div>
+          <div class="section">
+            <span>🎯</span>
+            <span>Strategy & Usage</span>
+          </div>
           <div class="content">${details.strategy || 'Core combat unit with standard tactical applications.'}</div>
           
-          <div class="section">🤝 Synergies</div>
+          <div class="section">
+            <span>🤝</span>
+            <span>Team Synergies</span>
+          </div>
           <div class="content synergy">${details.synergies || 'Works well with most team compositions.'}</div>
           
-          <div class="section">⚔️ Counters & Weaknesses</div>
+          <div class="section">
+            <span>⚔️</span>
+            <span>Counters & Weaknesses</span>
+          </div>
           <div class="content counter">${details.counters || 'Vulnerable to focus fire and good positioning.'}</div>
           
-          <div class="section">📍 Positioning</div>
+          <div class="section">
+            <span>📍</span>
+            <span>Positioning Guide</span>
+          </div>
           <div class="content">${details.positioning || 'Standard positioning based on role and situation.'}</div>
           
-          <div class="section">💡 Advanced Tips</div>
+          <div class="section">
+            <span>💡</span>
+            <span>Pro Tips</span>
+          </div>
           <div class="content tips">${details.tips || 'Master the basics before attempting advanced plays.'}</div>
         `;
         container.appendChild(div);
@@ -220,24 +416,24 @@
     loadBots();
   </script>
 
-  <div style="margin-top: 40px; padding: 16px; background: #f8fafc; border-radius: 8px;">
+  <div class="compositions">
     <h3>🏆 Team Composition Guidelines</h3>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 12px;">
-      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #10b981;">
+    <div class="comp-grid">
+      <div class="comp-card balanced">
         <strong>🛡️ Balanced Core:</strong> Tank + Sniper + Healer + Scout + Bomber<br>
-        <small>Reliable composition with good sustain and mixed damage types.</small>
+        <small>Reliable composition with good sustain and mixed damage types. Perfect for beginners learning the game.</small>
       </div>
-      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #3b82f6;">
+      <div class="comp-card aggressive">
         <strong>⚡ Aggressive Rush:</strong> Bruiser + Scout + Bomber + Pusher + Jammer<br>
-        <small>High-pressure composition focused on early fights and disruption.</small>
+        <small>High-pressure composition focused on early fights and disruption. Overwhelm enemies before they can set up.</small>
       </div>
-      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #7c3aed;">
+      <div class="comp-card control">
         <strong>🎯 Control Setup:</strong> Sniper + Wall Builder + Trap Setter + Puller + Silencer<br>
-        <small>Methodical composition controlling space and forcing favorable trades.</small>
+        <small>Methodical composition controlling space and forcing favorable trades. Deny enemy movement and positioning.</small>
       </div>
-      <div style="padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #f59e0b;">
+      <div class="comp-card sustain">
         <strong>🔄 Sustain Grind:</strong> Tank + Healer + Shield Giver + Reflector + Poisoner<br>
-        <small>Defensive composition that wins through superior sustain and DoT.</small>
+        <small>Defensive composition that wins through superior sustain and DoT. Outlast enemies in prolonged fights.</small>
       </div>
     </div>
   </div>

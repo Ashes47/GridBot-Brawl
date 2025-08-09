@@ -2,34 +2,561 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GridBot Brawl</title>
+  <title>GridBot Brawl - Strategic Bot Combat Arena</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Code your squad of five unique bots and watch them battle in strategic combat. Compete for glory in duo and quad leaderboards!">
   <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      color: #f8fafc;
+      line-height: 1.6;
+    }
+    
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    
+    .hero-content {
+      max-width: 800px;
+      z-index: 2;
+      position: relative;
+    }
+    
+    .hero h1 {
+      font-size: 4rem;
+      font-weight: 800;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #60a5fa, #34d399, #fbbf24);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+      line-height: 1.2;
+    }
+    
+    .hero-subtitle {
+      font-size: 1.5rem;
+      color: #cbd5e1;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+    
+    .hero-description {
+      font-size: 1.125rem;
+      color: #94a3b8;
+      margin-bottom: 40px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 60px;
+    }
+    
+    .btn {
+      padding: 14px 28px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(59, 130, 246, 0.5);
+    }
+    
+    .btn-secondary {
+      background: rgba(30, 41, 59, 0.8);
+      color: #e2e8f0;
+      border: 2px solid rgba(148, 163, 184, 0.3);
+      backdrop-filter: blur(10px);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.5);
+      transform: translateY(-2px);
+      color: white;
+    }
+    
+    /* Features Section */
+    .features {
+      padding: 80px 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .features h2 {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #f8fafc;
+    }
+    
+    .features-subtitle {
+      text-align: center;
+      font-size: 1.125rem;
+      color: #94a3b8;
+      margin-bottom: 60px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+    }
+    
+    .feature-card {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      border-radius: 16px;
+      padding: 32px;
+      transition: all 0.3s ease;
+      text-align: center;
+    }
+    
+    .feature-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    
+    .feature-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      display: block;
+    }
+    
+    .feature-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #e2e8f0;
+    }
+    
+    .feature-description {
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+    
+    /* Stats Section */
+    .stats {
+      background: rgba(15, 23, 42, 0.8);
+      padding: 60px 24px;
+      margin: 80px 0;
+    }
+    
+    .stats-container {
+      max-width: 800px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 40px;
+      text-align: center;
+    }
+    
+    .stat-item {
+      padding: 20px;
+    }
+    
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #60a5fa;
+      display: block;
+      margin-bottom: 8px;
+    }
+    
+    .stat-label {
+      color: #94a3b8;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.875rem;
+    }
+    
+    /* Game Modes Section */
+    .game-modes {
+      padding: 80px 24px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    
+    .game-modes h2 {
+      text-align: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 60px;
+      color: #f8fafc;
+    }
+    
+    .modes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 32px;
+    }
+    
+    .mode-card {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      border-radius: 16px;
+      padding: 40px;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .mode-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+    }
+    
+    .mode-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 32px rgba(0,0,0,0.2);
+    }
+    
+    .mode-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .mode-description {
+      color: #94a3b8;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    
+    .mode-features {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .mode-features li {
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+    }
+    
+    .mode-features li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #22c55e;
+      font-weight: bold;
+    }
+    
+    /* Footer CTA */
+    .footer-cta {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(34, 197, 94, 0.1));
+      padding: 80px 24px;
+      text-align: center;
+      margin-top: 80px;
+    }
+    
+    .footer-cta h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #f8fafc;
+    }
+    
+    .footer-cta p {
+      font-size: 1.125rem;
+      color: #94a3b8;
+      margin-bottom: 40px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2.5rem;
+      }
+      
+      .hero-subtitle {
+        font-size: 1.25rem;
+      }
+      
+      .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .btn {
+        width: 100%;
+        max-width: 300px;
+      }
+      
+      .features h2,
+      .game-modes h2,
+      .footer-cta h2 {
+        font-size: 2rem;
+      }
+      
+      .modes-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+      }
+    }
+    
+    /* Floating Animation */
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    .floating {
+      animation: float 6s ease-in-out infinite;
+    }
+  </style>
 </head>
 <body>
   <header class="site-header">
     <div class="nav">
-      <a class="brand" href="index.html"> GridBot Brawl</a>
+      <a class="brand" href="index.html">🤖 GridBot Brawl</a>
       <nav class="links">
         <a href="leaderboard.html?mode=duo">Leaderboards</a>
         <a href="teams.html">Teams</a>
         <a href="signup.html">Signup</a>
         <a href="guide.html">Guide</a>
         <a href="bots.html">Bots</a>
+        <a href="maps.html">Maps</a>
       </nav>
     </div>
   </header>
-  <section style="text-align:center; margin-top:60px;">
-    <h1 style="font-size:48px; margin-bottom:10px;">🤖 GridBot Brawl</h1>
-    <p style="font-size:18px; max-width:600px; margin:0 auto 20px;">Code your squad of five unique bots and watch them battle in a shared-vision arena. Compete for the top spot on duo and quad leaderboards!</p>
 
-    <div style="margin-top:30px;">
-      <a href="signup.html"><button>Register Team</button></a>
-      <a href="leaderboard.html?mode=duo"><button style="background:#2563eb;">View Leaderboards</button></a>
-      <a href="teams.html"><button style="background:#0ea5e9;">Browse Teams</button></a>
-      <a href="guide.html"><button style="background:#10b981;">Game Guide</button></a>
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <h1 class="floating">🤖 GridBot Brawl</h1>
+      <p class="hero-subtitle">Strategic Bot Combat Arena</p>
+      <p class="hero-description">
+        Code your squad of five unique bots and watch them battle in tactical combat. 
+        Master strategy, dominate leaderboards, and prove your programming prowess!
+      </p>
+      
+      <div class="cta-buttons">
+        <a href="signup.html" class="btn btn-primary">🚀 Register Team</a>
+        <a href="leaderboard.html?mode=duo" class="btn btn-secondary">🏆 View Leaderboards</a>
+        <a href="guide.html" class="btn btn-secondary">📖 Game Guide</a>
+      </div>
     </div>
   </section>
 
+  <!-- Stats Section -->
+  <section class="stats">
+    <div class="stats-container">
+      <div class="stat-item">
+        <span class="stat-number">4</span>
+        <span class="stat-label">Map Terrains</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">4</span>
+        <span class="stat-label">Special Zones</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">18</span>
+        <span class="stat-label">Bot Types</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-number">∞</span>
+        <span class="stat-label">Random Maps</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features">
+    <h2>Why GridBot Brawl?</h2>
+    <p class="features-subtitle">
+      Experience the perfect blend of programming strategy and competitive gaming
+    </p>
+    
+    <div class="features-grid">
+      <div class="feature-card">
+        <span class="feature-icon">⚔️</span>
+        <h3 class="feature-title">Strategic Combat</h3>
+        <p class="feature-description">
+          Each bot type has unique abilities - Snipers for long-range, Tanks for defense, 
+          Bombers for area damage, Scouts for mobility, and Teleporters for tactical positioning.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">🧠</span>
+        <h3 class="feature-title">Code Your Strategy</h3>
+        <p class="feature-description">
+          Write Python classes for each bot type. Implement custom logic for movement, 
+          targeting, and special abilities to outmaneuver your opponents.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">👁️</span>
+        <h3 class="feature-title">Shared Vision</h3>
+        <p class="feature-description">
+          Teams share vision within a radius, enabling coordinated attacks and defensive 
+          formations. Communication and positioning are key to victory.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">🏆</span>
+        <h3 class="feature-title">Competitive Ranking</h3>
+        <p class="feature-description">
+          Climb the leaderboards in both Duo (2v2) and Quad (4-team FFA) modes. 
+          Track your wins, losses, and damage statistics.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">🎮</span>
+        <h3 class="feature-title">Live Match Viewer</h3>
+        <p class="feature-description">
+          Watch your battles unfold in real-time with our advanced replay system. 
+          Analyze strategies and learn from every engagement.
+        </p>
+      </div>
+      
+      <div class="feature-card">
+        <span class="feature-icon">🗺️</span>
+        <h3 class="feature-title">Dynamic Maps</h3>
+        <p class="feature-description">
+          Battle across varied terrains with walls, forests, swamps, and special zones. 
+          Each map offers unique tactical opportunities and challenges.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Modes Section -->
+  <section class="game-modes">
+    <h2>Game Modes</h2>
+    
+    <div class="modes-grid">
+      <div class="mode-card">
+        <h3 class="mode-title">
+          🤖🤖 Duo Mode
+        </h3>
+        <p class="mode-description">
+          Two teams of 5 bots face off in intense 1v1 battles. Perfect for testing 
+          your strategies against focused opposition.
+        </p>
+        <ul class="mode-features">
+          <li>10x10 grid battlefield</li>
+          <li>Head-to-head competition</li>
+          <li>Ranked leaderboard system</li>
+          <li>Best for tactical refinement</li>
+        </ul>
+      </div>
+      
+      <div class="mode-card">
+        <h3 class="mode-title">
+          🤖🤖🤖🤖 Quad Mode
+        </h3>
+        <p class="mode-description">
+          Four teams battle simultaneously in chaotic free-for-all combat. 
+          Survive the longest to claim victory!
+        </p>
+        <ul class="mode-features">
+          <li>15x15 grid battlefield</li>
+          <li>4-team free-for-all</li>
+          <li>Dynamic alliances possible</li>
+          <li>Ultimate survival challenge</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer CTA -->
+  <section class="footer-cta">
+    <h2>Ready to Code Your Victory?</h2>
+    <p>
+      Join the arena and prove your programming skills. Register your team today 
+      and start your journey to the top of the leaderboards!
+    </p>
+    <div class="cta-buttons">
+      <a href="signup.html" class="btn btn-primary">🚀 Get Started Now</a>
+      <a href="teams.html" class="btn btn-secondary">👥 Browse Existing Teams</a>
+    </div>
+  </section>
+
+  <script>
+    
+    // Add smooth scrolling for better UX
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+          behavior: 'smooth'
+        });
+      });
+    });
+  </script>
 </body>
-</html> 
+</html>

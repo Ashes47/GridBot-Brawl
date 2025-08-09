@@ -47,3 +47,23 @@ COMPONENTS = [
 @router.get("/components")
 def get_components():
     return {"components": COMPONENTS} 
+
+
+@router.get("/map_rules")
+def get_map_rules():
+    """Expose current map rules for QA (optional)."""
+    try:
+        from ..maps import load_rules
+        r = load_rules()
+        return {
+            "grid_size": r.grid_size,
+            "wall_density": r.wall_density,
+            "forest_density": r.forest_density,
+            "swamp_density": r.swamp_density,
+            "ice_density": r.ice_density,
+            "zone_counts": r.zone_counts,
+            "spawn_margin": r.spawn_margin,
+            "ensure_path_between_spawns": r.ensure_path_between_spawns,
+        }
+    except Exception:
+        return {"error": "map rules unavailable"}

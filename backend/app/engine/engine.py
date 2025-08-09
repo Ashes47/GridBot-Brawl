@@ -62,6 +62,10 @@ class TurnEngine:
         self.damage_done_by_bot: Dict[str, int] = {}
         # Event taps for simulation logging
         self.trap_triggers: List[Tuple[int, int]] = []
+        # Zone events: list of (type, x, y, bot_id, extra)
+        self.zone_events: List[Tuple[str, int, int, str, Dict[str, int]]] = []
+        # Zone power-ups: list of (type, x, y, bot_id)
+        self.zone_powerups: List[Tuple[str, int, int, str]] = []
 
     # -------------------------------------------------------
     # Main entry
@@ -85,18 +89,21 @@ class TurnEngine:
             return
         self.damage_done_by_bot[bot_id] = self.damage_done_by_bot.get(bot_id, 0) + amount
 
+    def _forest_blocks(self, x: int, y: int) -> bool:
+        return (x, y) in self.state.terrain and self.state.terrain[(x, y)] == "forest"
+
     def _clear_los(self, src: Position, dst: Position) -> bool:
-        # Blocked by bots/decoys/walls; traps do not block
+        # Blocked by bots/decoys/walls and forest; water does not block
         if src.x == dst.x:
             step = 1 if dst.y > src.y else -1
             for y in range(src.y + step, dst.y, step):
-                if (src.x, y) in self.blockers:
+                if (src.x, y) in self.blockers or self._forest_blocks(src.x, y):
                     return False
             return True
         if src.y == dst.y:
             step = 1 if dst.x > src.x else -1
             for x in range(src.x + step, dst.x, step):
-                if (x, src.y) in self.blockers:
+                if (x, src.y) in self.blockers or self._forest_blocks(x, src.y):
                     return False
             return True
         # allow diagonal if both row and column are clear at each step (no corner cutting)
@@ -108,10 +115,10 @@ class TurnEngine:
                 # step one
                 nx, ny = cx + dx, cy + dy
                 # check both orthogonal corners from previous cell
-                if (cx + dx, cy) in self.blockers or (cx, cy + dy) in self.blockers:
+                if (cx + dx, cy) in self.blockers or (cx, cy + dy) in self.blockers or self._forest_blocks(cx + dx, cy) or self._forest_blocks(cx, cy + dy):
                     return False
                 # also ensure intermediate diagonal cell is not blocked (we'll land on dst eventually)
-                if (nx, ny) in self.blockers and (nx, ny) != (dst.x, dst.y):
+                if ((nx, ny) in self.blockers or self._forest_blocks(nx, ny)) and (nx, ny) != (dst.x, dst.y):
                     return False
                 cx, cy = nx, ny
             return True
@@ -251,8 +258,10 @@ class TurnEngine:
                 bot.power_cooldown = COOLDOWNS[bot.role]
                 return random.choice(empty_tiles)
             return bot.position  # no movement if full
-        # Dash (power move): move 2 tiles straight if both empty
+        # Dash (power move): move 2 tiles straight if both empty; slowed prohibits
         if isinstance(action, DashAction) and bot.power_cooldown == 0 and not silenced:
+            if bot.slowed_remaining > 0:
+                return bot.position
             dx, dy = action.direction.delta
             first = (bot.position.x + dx, bot.position.y + dy)
             second = (first[0] + dx, first[1] + dy)
@@ -264,27 +273,56 @@ class TurnEngine:
                 and 0 <= second[1] < size
                 and first not in self.blockers
                 and second not in self.blockers
+                and self.state.terrain.get(first) not in ("water", "swamp")
+                and self.state.terrain.get(second) not in ("water", "swamp")
             ):
                 bot.power_cooldown = COOLDOWNS[bot.role]
                 return Position(x=second[0], y=second[1])
             return bot.position  # failed dash
         # Leap (power move): diagonally 2 tiles over 1 unit/wall; target provided
         if isinstance(action, LeapAction) and bot.power_cooldown == 0 and not silenced:
+            if bot.slowed_remaining > 0:
+                return bot.position
             tgt = action.target
             if tgt.in_bounds(self.state.grid_size):
                 if abs(tgt.x - bot.position.x) == 2 and abs(tgt.y - bot.position.y) == 2:
                     mid = (bot.position.x + (1 if tgt.x > bot.position.x else -1), bot.position.y + (1 if tgt.y > bot.position.y else -1))
                     dest = (tgt.x, tgt.y)
-                    if dest not in self.blockers and (mid in self.blockers):
+                    # cannot traverse swamp/water; dest cannot be water/swamp; allow jumping over one blocker at mid
+                    if (
+                        dest not in self.blockers
+                        and (mid in self.blockers)
+                        and self.state.terrain.get(mid) not in ("swamp", "water")
+                        and self.state.terrain.get(dest) not in ("swamp", "water")
+                    ):
                         bot.power_cooldown = COOLDOWNS[bot.role]
                         return Position(x=tgt.x, y=tgt.y)
             return bot.position
         # Normal move (compute coords first to avoid invalid Position)
         if isinstance(action, MoveAction):
+            # slowed prohibits movement powers and move
+            if bot.slowed_remaining > 0:
+                return bot.position
             dx, dy = action.direction.delta
             nx, ny = bot.position.x + dx, bot.position.y + dy
             if 0 <= nx < self.state.grid_size and 0 <= ny < self.state.grid_size:
+                # water impassable
+                if self.state.terrain.get((nx, ny)) == "water":
+                    return bot.position
                 if (nx, ny) not in self.blockers:
+                    # handle ice sliding up to +2 after landing on ice (only for normal move)
+                    if self.state.terrain.get((nx, ny)) == "ice":
+                        fx, fy = nx, ny
+                        steps = 0
+                        while steps < 2:
+                            tx, ty = fx + dx, fy + dy
+                            if not (0 <= tx < self.state.grid_size and 0 <= ty < self.state.grid_size):
+                                break
+                            if (tx, ty) in self.blockers or self.state.terrain.get((tx, ty)) == "water":
+                                break
+                            fx, fy = tx, ty
+                            steps += 1
+                        return Position(x=fx, y=fy)
                     return Position(x=nx, y=ny)
         return bot.position
 
@@ -326,7 +364,12 @@ class TurnEngine:
                         dx = 0 if tgt.position.x == bot.position.x else (-1 if tgt.position.x > bot.position.x else 1)
                         dy = 0 if tgt.position.y == bot.position.y else (-1 if tgt.position.y > bot.position.y else 1)
                         dest = (tgt.position.x - dx, tgt.position.y - dy)
-                        if 0 <= dest[0] < self.state.grid_size and 0 <= dest[1] < self.state.grid_size and dest not in self.blockers:
+                        if (
+                            0 <= dest[0] < self.state.grid_size
+                            and 0 <= dest[1] < self.state.grid_size
+                            and dest not in self.blockers
+                            and self.state.terrain.get(dest) != "water"
+                        ):
                             tgt.position = Position(x=dest[0], y=dest[1])
                 bot.power_cooldown = COOLDOWNS[bot.role]
             elif isinstance(action, ShoveAction) and bot.power_cooldown == 0 and not silenced:
@@ -341,7 +384,12 @@ class TurnEngine:
                         dx = 0 if tgt.position.x == bot.position.x else (1 if tgt.position.x > bot.position.x else -1)
                         dy = 0 if tgt.position.y == bot.position.y else (1 if tgt.position.y > bot.position.y else -1)
                         dest = (tgt.position.x + dx, tgt.position.y + dy)
-                        if 0 <= dest[0] < self.state.grid_size and 0 <= dest[1] < self.state.grid_size and dest not in self.blockers:
+                        if (
+                            0 <= dest[0] < self.state.grid_size
+                            and 0 <= dest[1] < self.state.grid_size
+                            and dest not in self.blockers
+                            and self.state.terrain.get(dest) != "water"
+                        ):
                             tgt.position = Position(x=dest[0], y=dest[1])
                 bot.power_cooldown = COOLDOWNS[bot.role]
         # update references again after displacements
@@ -359,6 +407,15 @@ class TurnEngine:
                     break
         if to_remove:
             self.state.traps = [t for t in self.state.traps if t not in to_remove]
+
+        # Note zone power-ups for bots currently standing on zones (preview before EoT effects)
+        self.zone_powerups = []
+        for b in self.state.all_bots():
+            tile = (b.position.x, b.position.y)
+            zs = self.state.zones.get(tile, [])
+            for zt in zs:
+                # record one per zone type on tile
+                self.zone_powerups.append((zt, tile[0], tile[1], b.id))
 
     def _trigger_trap(self, trap: Trap, entrant: Bot):
         # 20 AoE to all adjacent 3x3 including allies; include entrant as well
@@ -477,6 +534,8 @@ class TurnEngine:
                 bot.silenced_remaining -= 1
             if bot.jammed_remaining > 0:
                 bot.jammed_remaining -= 1
+            if bot.slowed_remaining > 0:
+                bot.slowed_remaining -= 1
             # poison ticks (10 per stack)
             if bot.poison_stacks:
                 total = 10 * len(bot.poison_stacks)
@@ -486,6 +545,52 @@ class TurnEngine:
             if bot.shield_expire_turn is not None and self.state.turn >= bot.shield_expire_turn:
                 bot.shield_pool_remaining = 0
                 bot.shield_expire_turn = None
+        # Zones processing: boost after normal decrement, then heal/damage, then teleport
+        for bot in self.state.all_bots():
+            tile = (bot.position.x, bot.position.y)
+            zones = self.state.zones.get(tile, [])
+            if not zones:
+                continue
+            # Boost
+            if "boost" in zones:
+                if bot.power_cooldown > 0:
+                    bot.power_cooldown = max(0, bot.power_cooldown - 1)
+                self.zone_events.append(("boost", tile[0], tile[1], bot.id, {}))
+            # Heal/Damage
+            if "heal" in zones:
+                before = bot.hp
+                bot.hp = min(MAX_HP, bot.hp + 20)
+                if bot.hp > before:
+                    self.zone_events.append(("heal", tile[0], tile[1], bot.id, {}))
+            if "damage" in zones:
+                bot.apply_damage(10)
+                self.zone_events.append(("damage", tile[0], tile[1], bot.id, {}))
+        # Teleports applied after all bots processed to avoid chain issues
+        teleports: List[Tuple[Bot, Tuple[int, int]]] = []
+        for bot in self.state.all_bots():
+            tile = (bot.position.x, bot.position.y)
+            if "teleport" in self.state.zones.get(tile, []):
+                teleports.append((bot, tile))
+        if teleports:
+            # compute all empty tiles
+            empty_tiles = [
+                (x, y)
+                for x in range(self.state.grid_size)
+                for y in range(self.state.grid_size)
+                if (x, y) not in self.blockers and self.state.terrain.get((x, y)) != "water"
+            ]
+            for b, from_tile in teleports:
+                if empty_tiles:
+                    tx, ty = random.choice(empty_tiles)
+                    b.position = Position(x=tx, y=ty)
+                    self.zone_events.append(("teleport", from_tile[0], from_tile[1], b.id, {"to_x": tx, "to_y": ty}))
+            # refresh references
+            self.occupancy_bots = self.state.occupied_positions_bots()
+            self.blockers = self.state.blockers()
+        # Apply swamp slowed to bots that ended their move on swamp (affects next turn)
+        for bot in self.state.all_bots():
+            if self.state.terrain.get((bot.position.x, bot.position.y)) == "swamp":
+                bot.slowed_remaining = max(bot.slowed_remaining, 1)
         # refresh references
         self.occupancy_bots = self.state.occupied_positions_bots()
         self.blockers = self.state.blockers() 

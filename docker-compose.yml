@@ -34,6 +34,7 @@ services:
     volumes:
       - ./data/teams:/app/data/teams
       - ./data/matches:/app/data/matches
+      - ./maps:/app/maps
     networks:
       - botnet
 
@@ -51,6 +52,7 @@ services:
     volumes:
       - ./data/teams:/app/data/teams
       - ./data/matches:/app/data/matches
+      - ./maps:/app/maps
     networks:
       - botnet
 
@@ -68,6 +70,7 @@ services:
     volumes:
       - ./data/teams:/app/data/teams
       - ./data/matches:/app/data/matches
+      - ./maps:/app/maps
     networks:
       - botnet
 

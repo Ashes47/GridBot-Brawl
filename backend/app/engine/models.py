@@ -54,6 +54,8 @@ class Bot(BaseModel):
     silenced_remaining: int = 0
     jammed_remaining: int = 0
     poison_stacks: List[int] = []  # each entry is remaining turns (ticks at EoT)
+    # Terrain effects
+    slowed_remaining: int = 0  # from swamp: prevents Move/Dash/Leap next turn
 
     def is_alive(self) -> bool:
         return self.hp > 0
@@ -226,6 +228,10 @@ class GameState(BaseModel):
     walls: List[Wall] = []
     traps: List[Trap] = []
     decoys: List[Decoy] = []
+    # Map fields
+    static_walls: List[Tuple[int, int]] = []  # permanent blockers
+    terrain: Dict[Tuple[int, int], str] = {}  # tile -> terrain type
+    zones: Dict[Tuple[int, int], List[str]] = {}  # tile -> list of zone types
 
     def all_bots(self) -> List[Bot]:
         return [b for team in self.teams for b in team.bots if b.is_alive()]
@@ -235,7 +241,7 @@ class GameState(BaseModel):
         return {(b.position.x, b.position.y): b for b in self.all_bots()}
 
     def blockers(self) -> Dict[Tuple[int, int], str]:
-        # positions that block movement/LoS: bots, decoys, walls
+        # positions that block movement/LoS: bots, decoys, walls, static_walls (LoS only for some terrain handled elsewhere)
         blockers: Dict[Tuple[int, int], str] = {}
         for b in self.all_bots():
             blockers[(b.position.x, b.position.y)] = "bot"
@@ -243,6 +249,8 @@ class GameState(BaseModel):
             blockers[(d.x, d.y)] = "decoy"
         for w in self.walls:
             blockers[(w.x, w.y)] = "wall"
+        for sx, sy in self.static_walls:
+            blockers[(sx, sy)] = "wall"
         return blockers
 
     def bot_by_id(self, bot_id: str) -> Optional[Bot]:

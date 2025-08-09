@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -42,3 +42,7 @@ class Match(Base):
     status = Column(String(20), nullable=False, default="pending")
     team_hp = Column(Text, nullable=True)  # JSON-encoded {team_id: hp}
     team_damage = Column(Text, nullable=True)  # JSON-encoded {team_id: dmg} 
+    # Map metadata
+    map_name = Column(String(100), nullable=True)
+    # store as integer for deterministic generator seed
+    map_seed = Column(Integer, nullable=True)

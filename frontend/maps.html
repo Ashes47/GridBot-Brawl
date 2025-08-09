@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Maps & Terrain – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { 
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif; 
+      margin: 0; 
+      padding: 20px;
+      max-width: 1200px; 
+      margin: 0 auto;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+      color: #f8fafc;
+      min-height: 100vh;
+    }
+    
+    main {
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 16px;
+      padding: 32px;
+      margin-top: 20px;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    
+    h1 { 
+      color: #f1f5f9; 
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    
+    h2 { 
+      color: #60a5fa; 
+      border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+      padding-bottom: 8px;
+      margin-top: 32px;
+      font-size: 1.5rem;
+    }
+    
+    h3 {
+      color: #93c5fd;
+      margin-top: 24px;
+      font-size: 1.2rem;
+    }
+    
+    p {
+      color: #cbd5e1;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+    
+    .intro {
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 1.1rem;
+      color: #cbd5e1;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .terrain-grid, .zone-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      margin: 24px 0;
+    }
+    
+    .terrain-card, .zone-card {
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .terrain-card:hover, .zone-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+    
+    .terrain-header, .zone-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    
+    .terrain-emoji, .zone-emoji {
+      font-size: 2rem;
+    }
+    /* Compact color swatch used instead of terrain emojis to avoid clutter */
+    .terrain-swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+      display: inline-block;
+      margin-right: 4px;
+    }
+    
+    .terrain-name, .zone-name {
+      color: #f1f5f9;
+    }
+    
+    .terrain-desc, .zone-desc {
+      color: #cbd5e1;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    
+    .mechanics {
+      background: rgba(59, 130, 246, 0.1);
+      border-left: 4px solid #3b82f6;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    
+    .mechanics strong {
+      color: #60a5fa;
+    }
+    
+    .strategy {
+      background: rgba(16, 185, 129, 0.1);
+      border-left: 4px solid #10b981;
+      padding: 12px;
+      border-radius: 6px;
+    }
+    
+    .strategy strong {
+      color: #34d399;
+    }
+    
+    .warning {
+      background: rgba(239, 68, 68, 0.1);
+      border-left: 4px solid #ef4444;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 16px 0;
+    }
+    
+    .warning strong {
+      color: #f87171;
+    }
+    
+    .info-box {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+      border-left: 4px solid #3b82f6;
+    }
+    
+    .info-box strong {
+      color: #60a5fa;
+    }
+    
+    code {
+      background: rgba(15, 23, 42, 0.8);
+      color: #a78bfa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+    
+    .rules-section {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+    
+    ul, ol {
+      color: #cbd5e1;
+      margin-bottom: 16px;
+    }
+    
+    li {
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    
+    .visual-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 40px);
+      gap: 2px;
+      margin: 16px 0;
+      justify-content: center;
+    }
+    
+    .grid-cell {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      border-radius: 4px;
+      font-size: 20px;
+      background: rgba(30, 41, 59, 0.8);
+    }
+    
+    .grid-cell.forest { background: rgba(34, 197, 94, 0.25); }
+    .grid-cell.swamp { background: rgba(120, 72, 0, 0.28); }
+    .grid-cell.ice { background: rgba(59, 130, 246, 0.22); }
+    .grid-cell.water { background: rgba(37, 99, 235, 0.35); }
+    .grid-cell.wall { background: rgba(100, 116, 139, 0.8); }
+    .grid-cell.heal { background: rgba(34, 197, 94, 0.2); }
+    .grid-cell.damage { background: rgba(239, 68, 68, 0.2); }
+    .grid-cell.boost { background: rgba(234, 179, 8, 0.2); }
+    .grid-cell.teleport { background: rgba(168, 85, 247, 0.2); }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="nav">
+      <a class="brand" href="index.html">🤖 GridBot Brawl</a>
+      <nav class="links">
+        <a href="leaderboard.html?mode=duo">Leaderboards</a>
+        <a href="teams.html">Teams</a>
+        <a href="signup.html">Signup</a>
+        <a href="guide.html">Guide</a>
+        <a href="bots.html">Bots</a>
+        <a href="maps.html">Maps</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>🗺️ Maps, Terrain & Zones</h1>
+    <div class="intro">
+      <p>Master the dynamic battlefield with procedurally generated maps featuring diverse terrain types and strategic zones. Every match presents unique tactical challenges!</p>
+    </div>
+
+    <div class="info-box">
+      <strong>🎲 Map Generation:</strong> All maps are server-generated using seeds for fairness. Each match features a unique <code>map_name</code> and <code>map_seed</code> for deterministic replays. Maps scale from 10×10 (duo) to 15×15 (quad) with balanced spawn positions.
+    </div>
+
+    <h2>Terrain Types</h2>
+    <p>Terrain affects movement, line-of-sight, and tactical positioning. Each tile can have at most one terrain type.</p>
+
+    <div class="terrain-grid">
+      <div class="terrain-card">
+        <div class="terrain-header">
+          <span class="terrain-swatch" style="background: rgba(100, 116, 139, 0.7)"></span>
+          <span class="terrain-name">Static Walls</span>
+        </div>
+        <div class="terrain-desc">Permanent barriers that shape the battlefield layout and create chokepoints.</div>
+        <div class="mechanics">
+          <strong>Movement:</strong> Completely impassable - blocks all movement including Dash, Leap, and teleportation landing.<br>
+          <strong>Line of Sight:</strong> Blocks all LoS for attacks, powers, and vision.
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Use for cover, funnel enemies into kill zones, protect backline positioning. Wall Builders can create temporary versions.
+        </div>
+      </div>
+
+      <div class="terrain-card">
+        <div class="terrain-header">
+          <span class="terrain-swatch" style="background: rgba(34, 197, 94, 0.25)"></span>
+          <span class="terrain-name">Forest</span>
+        </div>
+        <div class="terrain-desc">Dense woodland that provides concealment while allowing movement through.</div>
+        <div class="mechanics">
+          <strong>Movement:</strong> Free passage - no penalties or restrictions.<br>
+          <strong>Line of Sight:</strong> Blocks LoS including diagonal corner-cutting. Cannot snipe through forest corners.
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Break enemy sightlines, counter snipers, create ambush positions. Scout mobility shines in forest terrain.
+        </div>
+      </div>
+
+      <div class="terrain-card">
+        <div class="terrain-header">
+          <span class="terrain-swatch" style="background: rgba(120, 72, 0, 0.28)"></span>
+          <span class="terrain-name">Swamp</span>
+        </div>
+        <div class="terrain-desc">Treacherous wetlands that bog down movement for the following turn.</div>
+        <div class="mechanics">
+          <strong>Movement:</strong> Entry allowed, but ending turn on swamp applies <em>Slowed</em> status.<br>
+          <strong>Slowed Effect:</strong> Next turn cannot use Move, Dash, or Leap actions. Powers still work.
+        </div>
+        <div class="warning">
+          <strong>Tactical Warning:</strong> Dash and Leap fail if ANY traversed tile is swamp. Plan movement carefully!
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Area denial, punish aggressive positioning. Puller can force enemies into swamp. Avoid when escaping.
+        </div>
+      </div>
+
+      <div class="terrain-card">
+        <div class="terrain-header">
+          <span class="terrain-swatch" style="background: rgba(59, 130, 246, 0.22)"></span>
+          <span class="terrain-name">Ice</span>
+        </div>
+        <div class="terrain-desc">Slippery surfaces that cause normal movement to slide additional tiles.</div>
+        <div class="mechanics">
+          <strong>Movement:</strong> Normal Move onto ice slides up to 2 extra tiles in the same direction.<br>
+          <strong>Special Rules:</strong> Dash and Leap do NOT trigger sliding. Sliding stops at blockers.
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Unexpected positioning, surprise flanks, or accidental overextension. Can slide into danger or safety - plan carefully!
+        </div>
+      </div>
+
+      <div class="terrain-card">
+        <div class="terrain-header">
+          <span class="terrain-swatch" style="background: rgba(37, 99, 235, 0.35)"></span>
+          <span class="terrain-name">Water</span>
+        </div>
+        <div class="terrain-desc">Deep water that blocks all movement while maintaining clear sightlines.</div>
+        <div class="mechanics">
+          <strong>Movement:</strong> Completely impassable - blocks Move, Dash, Leap, and teleportation.<br>
+          <strong>Line of Sight:</strong> Transparent - does NOT block LoS. Snipers can shoot over water.
+        </div>
+        <div class="warning">
+          <strong>Tactical Warning:</strong> Yank and Shove cannot place targets in water - abilities fail if destination is water.
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Natural barriers that channel movement while preserving sightlines. Use for kiting and range advantage.
+        </div>
+      </div>
+    </div>
+
+    <h2>Zone Effects</h2>
+    <p>Zones activate at <strong>end of turn</strong> for bots standing on the tile. Multiple zones can stack on the same tile!</p>
+
+    <div class="zone-grid">
+      <div class="zone-card">
+        <div class="zone-header">
+          <span class="zone-emoji">💚</span>
+          <span class="zone-name">Heal Zone</span>
+        </div>
+        <div class="zone-desc">Regenerative energy that restores health to wounded bots.</div>
+        <div class="mechanics">
+          <strong>Effect:</strong> +20 HP at end of turn (capped at 100 max HP).<br>
+          <strong>Timing:</strong> Applies after damage/poison but before shield expiration.
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Control heal zones for sustain advantage. Combine with tanks for extended frontline presence. Contest with poison/damage.
+        </div>
+      </div>
+
+      <div class="zone-card">
+        <div class="zone-header">
+          <span class="zone-emoji">💀</span>
+          <span class="zone-name">Damage Zone</span>
+        </div>
+        <div class="zone-desc">Hazardous areas that harm any bot unfortunate enough to linger.</div>
+        <div class="mechanics">
+          <strong>Effect:</strong> -10 HP at end of turn.<br>
+          <strong>Shield Interaction:</strong> Damage IS reduced by active shields (75% reduction).
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Area denial, finish wounded enemies. Push/Pull enemies onto damage zones. Shield Givers can mitigate damage.
+        </div>
+      </div>
+
+      <div class="zone-card">
+        <div class="zone-header">
+          <span class="zone-emoji">⚡</span>
+          <span class="zone-name">Boost Zone</span>
+        </div>
+        <div class="zone-desc">Energizing fields that accelerate power recovery beyond normal rates.</div>
+        <div class="mechanics">
+          <strong>Effect:</strong> After normal cooldown decrement, reduce ALL cooldowns by 1 additional turn (minimum 0).<br>
+          <strong>Stacking:</strong> Multiple boost zones on same tile don't stack.
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Power spam, faster combo setups. Especially valuable for high-cooldown powers like Snipe, Explode, Teleport.
+        </div>
+      </div>
+
+      <div class="zone-card">
+        <div class="zone-header">
+          <span class="zone-emoji">✨</span>
+          <span class="zone-name">Teleport Zone</span>
+        </div>
+        <div class="zone-desc">Unstable spatial rifts that relocate bots to random battlefield positions.</div>
+        <div class="mechanics">
+          <strong>Effect:</strong> Instantly teleport to a random empty tile anywhere on the map.<br>
+          <strong>Valid Destinations:</strong> Any empty tile except walls, static walls, water, or occupied spaces.
+        </div>
+        <div class="warning">
+          <strong>Unpredictable:</strong> Can teleport into enemy territory, safety, or isolated positions. High risk, high reward!
+        </div>
+        <div class="strategy">
+          <strong>Strategy:</strong> Escape mechanism, surprise flanks, or disruption. Risk/reward varies greatly by game state.
+        </div>
+      </div>
+    </div>
+
+    <h2>Advanced Mechanics</h2>
+    <div class="rules-section">
+      <h3>🎯 Line of Sight Rules</h3>
+      <ul>
+        <li><strong>Blockers:</strong> Static walls, player walls, forest, bots, and decoys block LoS</li>
+        <li><strong>Transparent:</strong> Water, all zone types, swamp, and ice do NOT block LoS</li>
+        <li><strong>Forest Corner Rule:</strong> Cannot "corner cut" diagonally through forest tiles</li>
+        <li><strong>Range Limits:</strong> Snipe (5 tiles), most powers (3 tiles), visibility (4 Chebyshev)</li>
+      </ul>
+
+      <h3>⚡ End of Turn Processing Order</h3>
+      <ol>
+        <li>Poison/trap/wall TTLs decrement and expire</li>
+        <li>Normal power cooldowns decrement</li>
+        <li><strong>Boost zones</strong> provide extra cooldown reduction</li>
+        <li><strong>Heal zones</strong> restore HP (capped at 100)</li>
+        <li><strong>Damage zones</strong> deal damage (reduced by shields)</li>
+        <li><strong>Teleport zones</strong> relocate bots</li>
+        <li>Swamp applies <em>Slowed</em> status for next turn</li>
+        <li>Shields expire after their duration</li>
+      </ol>
+
+      <h3>🛡️ Terrain Interactions</h3>
+      <ul>
+        <li><strong>Power Failures:</strong> Dash/Leap fail if ANY traversed tile is swamp or water</li>
+        <li><strong>Displacement Limits:</strong> Yank/Shove fail if destination is water</li>
+        <li><strong>Teleportation:</strong> Random teleports avoid walls, water, and occupied tiles</li>
+        <li><strong>Ice Sliding:</strong> Only normal Move triggers sliding; powers don't slide</li>
+        <li><strong>Zone Stacking:</strong> Multiple zones on same tile all apply (rare but possible)</li>
+      </ul>
+    </div>
+
+    <h2>Strategic Map Reading</h2>
+    <div class="info-box">
+      <strong>🧠 Pro Tips:</strong> Study the map before committing to positioning. Identify chokepoints, LoS lanes, escape routes, and zone control opportunities. Adapt your team composition mental model to the terrain!
+    </div>
+
+    <div class="visual-grid">
+      <div class="grid-cell wall">🧱</div>
+      <div class="grid-cell forest">🌲</div>
+      <div class="grid-cell">🤖</div>
+      <div class="grid-cell swamp">🟫</div>
+      <div class="grid-cell ice">❄️</div>
+      <div class="grid-cell water">💧</div>
+      <div class="grid-cell heal">💚</div>
+      <div class="grid-cell damage">💀</div>
+      <div class="grid-cell boost">⚡</div>
+      <div class="grid-cell teleport">✨</div>
+      <div class="grid-cell">🎯</div>
+      <div class="grid-cell">🎯</div>
+      <div class="grid-cell">🎯</div>
+      <div class="grid-cell">🎯</div>
+      <div class="grid-cell">🎯</div>
+      <div class="grid-cell">🎯</div>
+    </div>
+    <p style="text-align: center; font-size: 14px; color: #94a3b8; margin-top: 8px;">
+      Example map layout showing terrain variety and tactical complexity
+    </p>
+
+    <div class="warning">
+      <strong>⚖️ Competitive Balance:</strong> Maps are procedurally generated with balanced spawn positions and fair terrain distribution. No team gets inherent map advantages - adapt your strategy to the terrain!
+    </div>
+
+    <p style="text-align: center; margin-top: 32px;">
+      <a href="guide.html" style="color: #60a5fa; text-decoration: none; font-weight: 600;">← Back to Game Guide</a> | 
+      <a href="bots.html" style="color: #60a5fa; text-decoration: none; font-weight: 600;">Bot Strategies →</a>
+    </p>
+  </main>
+</body>
+</html>

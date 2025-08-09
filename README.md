@@ -127,3 +127,11 @@ If these folders are missing or unwritable, uploads and match logs will fail.
 - Celery tasks not running: confirm Redis is reachable (`CELERY_BROKER_URL`) and workers are up for queues `baseline` and `simulation`.
 - Log download 404: check the file exists under `data/matches/` and container paths match host volumes.
 - CORS during local dev: the API allows `http://localhost:8080` by default.
+
+## Map system
+
+- Procedural seed maps are generated per match using `maps/map_rules.json`. The assigned seed and map name are stored on the `matches` row and embedded in the log header.
+- Static maps can be dropped into `maps/` as JSON matching the MapSpec schema; disabled by default via `"disabled": true`.
+- Optional envs:
+  - `MAP_RULES_PATH` to point to a custom rules file
+  - `FORCE_MAP_SEED` to force a specific seed for QA

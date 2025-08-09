@@ -51,16 +51,22 @@ def _run_async(coro):
 def run_match(match_id: str, team_ids: List[str]) -> dict | None:
     """Run a match and update DB rows (sync SQLAlchemy session)."""
     with SessionLocal() as session:  # type: Session
-        # mark running
+        # mark running and assign map seed/name upfront
+        import os, random
+        s = os.getenv("FORCE_MAP_SEED")
+        seed = int(s) if s and s.isdigit() else random.randint(1, 2**31 - 1)
+        map_name = f"seed_map_{seed}"
         session.execute(
-            update(Match).where(Match.id == uuid.UUID(match_id)).values(status="running")
+            update(Match)
+            .where(Match.id == uuid.UUID(match_id))
+            .values(status="running", map_seed=seed, map_name=map_name)
         )
         session.commit()
         try:
             async def _go():
                 AsyncSessionMaker = get_async_sessionmaker()
                 async with AsyncSessionMaker() as a_sess:
-                    return await simulate_match(a_sess, team_ids)
+                    return await simulate_match(a_sess, team_ids, seed=seed)
 
             result = _run_async(_go())
 
@@ -73,6 +79,8 @@ def run_match(match_id: str, team_ids: List[str]) -> dict | None:
                     log_path=result["log_path"],
                     team_hp=json.dumps(result["team_hp"]),
                     team_damage=json.dumps(result["team_damage"]),
+                    map_name=result.get("map_name"),
+                    map_seed=int(result.get("map_seed") or 0),
                 )
             )
             session.commit()
