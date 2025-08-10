@@ -422,7 +422,16 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
             elif t == 'heal':
                 events.append(f"🧬 {bid} healed an ally")
             elif t == 'infect':
-                events.append(f"💉 {bid} infected a target")
+                # resolve target id from prev occupancy if possible
+                tgt_xy = ad.get('target')
+                if isinstance(tgt_xy, list) and len(tgt_xy) == 2:
+                    tgt_id = prev_occupancy.get((tgt_xy[0], tgt_xy[1]))
+                    if tgt_id:
+                        events.append(f"💉 {bid} infected {tgt_id}")
+                    else:
+                        events.append(f"💉 {bid} infected {tgt_xy}")
+                else:
+                    events.append(f"💉 {bid} infected a target")
             elif t == 'silence':
                 events.append(f"🔇 {bid} silenced a target")
             elif t == 'mirror':
@@ -537,6 +546,8 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
                 "observations": sandbox.last_observations,
                 "cooldowns": cooldowns,
                 "shields": shields,
+                # expose poison stack counts for frontend VFX/UI
+                "poison": {b.id: len(b.poison_stacks) for b in state.all_bots()},
                 "structures": structures,
                 "events": events,
             }

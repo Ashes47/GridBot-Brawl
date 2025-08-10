@@ -509,6 +509,7 @@
     .timeline-event.explosion { background: #f97316; }
     .timeline-event.snipe { background: #eab308; }
     .timeline-event.shield { background: #3b82f6; }
+    .timeline-event.poison { background: #84cc16; }
     
     .bookmark-btn {
       background: linear-gradient(135deg, #8b5cf6, #7c3aed);
@@ -1066,8 +1067,8 @@
     let sfxEnabled = false;
     let audioCtx = null;
     let noiseBuf = null;
-    const sfxCooldownMs = {attack:120, snipe:220, explode:380, shield:180};
-    const sfxLastAt = {attack:0, snipe:0, explode:0, shield:0};
+    const sfxCooldownMs = {attack:120, snipe:220, explode:380, shield:180, poison:180};
+    const sfxLastAt = {attack:0, snipe:0, explode:0, shield:0, poison:0};
     function initAudio(){ if(!audioCtx){ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); makeNoiseBuffer(); } }
     function makeNoiseBuffer(){
       const sr = audioCtx.sampleRate; const len = sr * 0.3; const buf = audioCtx.createBuffer(1,len,sr); const data = buf.getChannelData(0);
@@ -1241,14 +1242,14 @@
       playing=false; clearTimeout(timer);
       for (let i=tick-1;i>=0;i--){
         const ev = frames[i].events||[];
-        if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { tick=i; render(); return; }
+        if (ev.some(s=>/[🛡🎯💣☠️⚔️💉]/.test(s))) { tick=i; render(); return; }
       }
     };
     document.getElementById('nextEvent').onclick = ()=>{
       playing=false; clearTimeout(timer);
       for (let i=tick+1;i<frames.length;i++){
         const ev = frames[i].events||[];
-        if (ev.some(s=>/[🛡🎯💣☠️⚔️]/.test(s))) { tick=i; render(); return; }
+        if (ev.some(s=>/[🛡🎯💣☠️⚔️💉]/.test(s))) { tick=i; render(); return; }
       }
       // if none further, show end panel
       showEndPanel();
@@ -1606,6 +1607,16 @@
         ctx.fillRect(barX, barY, barW, barH);
         ctx.fillStyle = '#22c55e';
         ctx.fillRect(barX, barY, barW*(hp/100), barH);
+        // poison badge (stack count)
+        const poisonStacks = (frame.poison && typeof frame.poison[botId] === 'number') ? frame.poison[botId] : 0;
+        if (poisonStacks > 0) {
+          const badgeText = `☠ x${poisonStacks}`;
+          ctx.fillStyle = 'rgba(132, 204, 22, 0.9)';
+          ctx.font = `${Math.max(10, px*0.28)}px sans-serif`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(badgeText, barX + barW + 6, barY + barH/2);
+        }
         // damage flash
         const prevHPSeen = lastHP[botId] ?? hpCurr;
         if(prevHPSeen > hpCurr){
@@ -1621,6 +1632,17 @@
         ctx.textBaseline = 'middle';
         const meta = META_BY_CODE[roleCode];
         ctx.fillStyle = meta?.color || '#000';
+        // poison aura glow if poisoned
+        if (poisonStacks > 0) {
+          const pulse = cinematic ? (0.4 + 0.3*Math.sin(now/180 + (x+y))) : 0.7;
+          ctx.save();
+          ctx.strokeStyle = `rgba(132, 204, 22, ${pulse})`;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc((x + 0.5) * px, (y + 0.5) * px, px / 3 + 2, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
         ctx.fillText(meta?.emoji || '?', (x+0.5)*px, (y+0.5)*px);
       }
       lastHP = frame.hp;
@@ -1747,6 +1769,19 @@
           }else if(act.type==='shield'){
             ctx.strokeStyle='blue';ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy,px/3+4,0,Math.PI*2);ctx.stroke();
             if (sfxEnabled && sfxTickStamp!==tick) sfx('shield');
+          }else if(act.type==='infect'){
+            // brief infect pulse at actor
+            const life = performance.now() - animStart;
+            if (life < 180){
+              ctx.save();
+              const alpha = 0.35 + 0.3*Math.sin(life/120);
+              ctx.strokeStyle=`rgba(132,204,22,${alpha})`;
+              ctx.lineWidth=3;
+              ctx.beginPath(); ctx.arc(sx,sy,px/3+6,0,Math.PI*2); ctx.stroke();
+              ctx.restore();
+            }
+            // no dedicated SFX type, reuse 'shield' subtle tone
+            if (sfxEnabled && sfxTickStamp!==tick) sfx('shield');
           }
         });
       }
@@ -1810,7 +1845,7 @@
       }
       ctx.restore();
 
-      // floating damage texts
+        // floating damage texts
       const nowt = performance.now();
       damageTexts = damageTexts.filter(d=> nowt < d.end);
       for (const d of damageTexts){
@@ -2342,6 +2377,9 @@
           hasEvent = true;
         } else if (events.some(e => e.includes('🛡'))) {
           eventType = 'shield';
+          hasEvent = true;
+        } else if (events.some(e => e.includes('💉'))) {
+          eventType = 'poison';
           hasEvent = true;
         }
         
