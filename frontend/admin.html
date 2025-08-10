@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Console – GridBot Brawl</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:24px; background: linear-gradient(135deg,#0f172a,#1e293b 50%,#334155); color:#f8fafc; }
+    .container { max-width: 1100px; margin:0 auto; background: rgba(30,41,59,0.95); border:1px solid rgba(71,85,105,.3); border-radius: 20px; padding: 24px; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
+    h1 { margin: 0 0 8px 0; }
+    .section { margin-top: 20px; padding:16px; border:1px solid rgba(71,85,105,.3); border-radius: 12px; background: rgba(15,23,42,.6); }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
+    label { color:#cbd5e1; font-weight:600; margin-right:6px; }
+    input[type="text"], input[type="password"], input[type="search"] { padding:8px 10px; border-radius: 8px; border:1px solid rgba(71,85,105,.5); background: rgba(15,23,42,.6); color:#e2e8f0; }
+    button { background: linear-gradient(135deg,#3b82f6,#1d4ed8); color:white; border:none; padding:10px 14px; border-radius: 8px; cursor:pointer; font-weight:600; }
+    button.danger { background: linear-gradient(135deg,#ef4444,#dc2626); }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+    .card { border:1px solid rgba(71,85,105,.3); border-radius: 10px; padding: 12px; background: rgba(51,65,85,.25); }
+    .muted { color:#94a3b8; font-size:12px; }
+    .desc { color:#cbd5e1; font-size: 13px; margin: 6px 0 10px; }
+    ul { list-style: none; padding: 0; margin: 8px 0 0 0; }
+    li { padding: 6px 8px; border-bottom: 1px solid rgba(71,85,105,.3); display:flex; align-items:center; justify-content: space-between; gap:8px; }
+    .pill { padding: 4px 10px; border-radius: 999px; background: rgba(59,130,246,.2); color:#93c5fd; border:1px solid rgba(59,130,246,.3); font-size: 12px; }
+  </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="nav">
+        <a class="brand" href="index.html">🤖 GridBot Brawl</a>
+        <nav class="links">
+          <a href="leaderboard.html?mode=duo">Leaderboards</a>
+          <a href="teams.html">Teams</a>
+          <a href="signup.html">Signup</a>
+          <a href="guide.html">Guide</a>
+          <a href="bots.html">Bots</a>
+          <a href="maps.html">Maps</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="container">
+      <h1>Admin Console</h1>
+      <div class="muted">Use your admin token for protected endpoints and the admin password for team-sensitive actions.</div>
+      <p class="desc">- <strong>Admin Token</strong>: Set header <code>X-Admin-Token</code> to access protected admin APIs (ratings, scheduler, baselines).<br>
+        - <strong>Admin Password</strong>: Required for team-specific destructive actions (reset a team password, delete team).</p>
+
+      <div class="section">
+        <div class="row">
+          <label>Admin Token</label>
+          <input id="admin-token" type="text" placeholder="X-Admin-Token" style="min-width:300px;">
+          <button id="save-token">Save</button>
+          <span class="muted" id="token-status"></span>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <label>Admin Password</label>
+          <input id="admin-pass" type="password" placeholder="ADMIN_PASSWORD" style="min-width:300px;">
+          <button id="save-pass">Save</button>
+          <span class="muted" id="pass-status"></span>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="desc"><strong>Find Team</strong>: Loads all teams on page load. Use search to filter locally by team name. Click "Select" to target actions to that team.</p>
+        <div class="row" style="margin-bottom:10px;">
+          <label>Find Team</label>
+          <input id="team-search" type="search" placeholder="Search by name…">
+          <button id="btn-search">Search</button>
+          <span class="muted">Selected Team: <span id="selected-team" class="pill">None</span></span>
+        </div>
+        <ul id="team-results"></ul>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Leaderboard</h3>
+          <p class="desc">- <strong>Re-compute Ratings</strong>: Replay finished matches to rebuild rating history (non-destructive).<br>
+            - <strong>Re-evaluate (Reset)</strong>: Clear matches/queue/ratings and re-enqueue calibration for all teams. Use with caution.</p>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-recompute">Re-compute Ratings</button>
+            <button id="btn-reeval" class="danger">Re-evaluate (Reset)</button>
+          </div>
+          <div class="muted" id="lb-status"></div>
+        </div>
+
+        <div class="card">
+          <h3>Scheduler</h3>
+          <p class="desc">- <strong>Run Ongoing Scheduler</strong>: Schedules matches for teams per current policy.<br>
+            - <strong>Consume One Queue Cycle</strong>: Run one pass of the queue consumer to pop/advance jobs.<br>
+            - <strong>Calibrate Selected Team</strong>: Enqueue matchup calibration for the selected team.</p>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-ongoing">Run Ongoing Scheduler</button>
+            <button id="btn-consume">Consume One Queue Cycle</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-calibrate">Calibrate Selected Team</button>
+          </div>
+          <div class="muted" id="sched-status"></div>
+        </div>
+
+        <div class="card">
+          <h3>Ratings & Baselines</h3>
+          <p class="desc">- <strong>Replay Ratings</strong>: Same as re-compute; triggers rating replay on background workers.<br>
+            - <strong>Inflate Sigma (Inactive)</strong>: Increases uncertainty for inactive teams to let them move more on next results.<br>
+            - <strong>Leaderboard Rebuild</strong>: Rebuild leaderboard caches (safe).<br>
+            - <strong>Seed Baselines</strong>: Create/update pinned baseline teams and write their code files.</p>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-ratings-recompute">Replay Ratings</button>
+            <button id="btn-inflate">Inflate Sigma (Inactive)</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-leaderboard-rebuild">Leaderboard Rebuild</button>
+            <button id="btn-seed-baselines">Seed Baselines</button>
+          </div>
+          <div class="muted" id="ratings-status"></div>
+        </div>
+
+        <div class="card">
+          <h3>Team Admin</h3>
+          <p class="desc">- <strong>Reset Password</strong>: Set a new password for the selected team (requires admin password).<br>
+            - <strong>Delete Team</strong>: Permanently delete the selected team and its code from disk (requires admin password).</p>
+          <div class="row" style="margin-top:8px;">
+            <input id="new-team-password" type="password" placeholder="New team password (min 6)">
+            <button id="btn-reset-pass">Reset Password</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-delete" class="danger">Delete Team</button>
+          </div>
+          <div class="muted" id="team-status"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <script>
+      const api = {
+        lbRecompute: 'http://localhost:8000/leaderboard/re-compute',
+        lbReeval: 'http://localhost:8000/leaderboard/re-evaluate',
+        schedOngoing: 'http://localhost:8000/admin/scheduler/ongoing',
+        schedConsume: 'http://localhost:8000/admin/scheduler/consume_once',
+        schedCalibrate: (teamId)=>`http://localhost:8000/admin/scheduler/calibrate/${teamId}`,
+        ratingsRecompute: 'http://localhost:8000/admin/ratings/recompute',
+        ratingsInflate: 'http://localhost:8000/admin/ratings/inflate_sigma',
+        leaderboardRebuild: 'http://localhost:8000/admin/leaderboard/rebuild',
+        baselinesSeed: 'http://localhost:8000/admin/baselines/seed',
+        teamListAll: `http://localhost:8000/teams?limit=10000`,
+        teamResetPassword: (id)=>`http://localhost:8000/teams/${id}/reset_password`,
+        teamDelete: (id)=>`http://localhost:8000/teams/${id}`,
+      };
+
+      const els = (id)=>document.getElementById(id);
+      let ADMIN_TOKEN = localStorage.getItem('admin_token') || '';
+      let ADMIN_PASS = localStorage.getItem('admin_pass') || '';
+      let SELECTED_TEAM_ID = null;
+      let TEAM_CACHE = [];
+
+      function loadCreds(){
+        els('admin-token').value = ADMIN_TOKEN;
+        els('admin-pass').value = ADMIN_PASS;
+      }
+      function headers(){ return ADMIN_TOKEN ? { 'X-Admin-Token': ADMIN_TOKEN } : {}; }
+      function setStatus(id, text){ els(id).textContent = text; }
+
+      async function doPost(url, hdrs){
+        const res = await fetch(url, { method:'POST', headers: hdrs || headers() });
+        if(!res.ok) throw new Error(await res.text());
+        return res.json().catch(()=>({status:'ok'}));
+      }
+
+      function renderTeams(list){
+        const ul = els('team-results');
+        ul.innerHTML = '';
+        list.forEach(it=>{
+          const li = document.createElement('li');
+          const left = document.createElement('div');
+          left.textContent = `${it.name}`;
+          const right = document.createElement('div');
+          const pick = document.createElement('button');
+          pick.textContent = 'Select';
+          pick.onclick = ()=>{ SELECTED_TEAM_ID = it.id; els('selected-team').textContent = it.name; els('selected-team').dataset.teamId = it.id; };
+          const open = document.createElement('a');
+          open.href = `team.html?id=${it.id}`; open.target = '_blank'; open.textContent = 'Open';
+          right.appendChild(pick); right.appendChild(open);
+          li.appendChild(left); li.appendChild(right);
+          ul.appendChild(li);
+        });
+      }
+
+      function filterTeams(){
+        const q = els('team-search').value.trim().toLowerCase();
+        if(!q) { renderTeams(TEAM_CACHE); return; }
+        const filtered = TEAM_CACHE.filter(t => (t.name || '').toLowerCase().includes(q));
+        renderTeams(filtered);
+      }
+
+      async function loadAllTeams(){
+        try {
+          const r = await fetch(api.teamListAll);
+          TEAM_CACHE = await r.json();
+          // sort by name asc
+          TEAM_CACHE.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+          renderTeams(TEAM_CACHE);
+        } catch(e) { /* ignore */ }
+      }
+
+      document.addEventListener('DOMContentLoaded', ()=>{
+        loadCreds();
+        els('save-token').onclick = ()=>{ ADMIN_TOKEN = els('admin-token').value.trim(); localStorage.setItem('admin_token', ADMIN_TOKEN); setStatus('token-status','Saved'); };
+        els('save-pass').onclick = ()=>{ ADMIN_PASS = els('admin-pass').value; localStorage.setItem('admin_pass', ADMIN_PASS); setStatus('pass-status','Saved'); };
+
+        // Team list and local search
+        loadAllTeams();
+        els('btn-search').onclick = filterTeams;
+        els('team-search').addEventListener('input', filterTeams);
+
+        // Leaderboard actions
+        els('btn-recompute').onclick = async ()=>{
+          try { setStatus('lb-status','Queuing re-compute…'); await doPost(api.lbRecompute); setStatus('lb-status','Queued'); } catch(e){ setStatus('lb-status','Failed'); alert(e.message); }
+        };
+        els('btn-reeval').onclick = async ()=>{
+          try {
+            if(!confirm('This will clear matches/queue/ratings and re-enqueue calibration. Continue?')) return;
+            setStatus('lb-status','Queuing re-evaluate…'); await doPost(api.lbReeval); setStatus('lb-status','Queued');
+          } catch(e){ setStatus('lb-status','Failed'); alert(e.message); }
+        };
+
+        // Scheduler actions
+        els('btn-ongoing').onclick = async ()=>{ try { setStatus('sched-status','Starting…'); await doPost(api.schedOngoing); setStatus('sched-status','Queued'); } catch(e){ setStatus('sched-status','Failed'); alert(e.message); } };
+        els('btn-consume').onclick = async ()=>{ try { setStatus('sched-status','Starting…'); await doPost(api.schedConsume); setStatus('sched-status','Queued'); } catch(e){ setStatus('sched-status','Failed'); alert(e.message); } };
+        els('btn-calibrate').onclick = async ()=>{ 
+          if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
+          try { setStatus('sched-status','Queuing calibration…'); await doPost(api.schedCalibrate(SELECTED_TEAM_ID)); setStatus('sched-status','Queued'); } catch(e){ setStatus('sched-status','Failed'); alert(e.message); }
+        };
+
+        // Ratings & baselines
+        els('btn-ratings-recompute').onclick = async ()=>{ try { setStatus('ratings-status','Queuing…'); await doPost(api.ratingsRecompute); setStatus('ratings-status','Queued'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
+        els('btn-inflate').onclick = async ()=>{ try { setStatus('ratings-status','Queuing…'); await doPost(api.ratingsInflate); setStatus('ratings-status','Queued'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
+        els('btn-leaderboard-rebuild').onclick = async ()=>{ try { setStatus('ratings-status','Queuing…'); await doPost(api.leaderboardRebuild); setStatus('ratings-status','Queued'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
+        els('btn-seed-baselines').onclick = async ()=>{ try { setStatus('ratings-status','Seeding…'); await doPost(api.baselinesSeed); setStatus('ratings-status','Done'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
+
+        // Team admin
+        els('btn-reset-pass').onclick = async ()=>{
+          if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
+          if(!ADMIN_PASS){ alert('Save admin password first'); return; }
+          const newPass = els('new-team-password').value.trim();
+          if(newPass.length < 6){ alert('Password must be at least 6 chars'); return; }
+          try {
+            setStatus('team-status','Resetting…');
+            const form = new FormData();
+            form.append('admin_password', ADMIN_PASS);
+            form.append('new_password', newPass);
+            const r = await fetch(api.teamResetPassword(SELECTED_TEAM_ID), { method:'POST', body: form });
+            if(!r.ok) throw new Error(await r.text());
+            setStatus('team-status','Password reset');
+          } catch(e){ setStatus('team-status','Failed'); alert(e.message); }
+        };
+        els('btn-delete').onclick = async ()=>{
+          if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
+          if(!ADMIN_PASS){ alert('Save admin password first'); return; }
+          if(!confirm('Delete team permanently?')) return;
+          try {
+            setStatus('team-status','Deleting…');
+            const form = new FormData();
+            form.append('admin_password', ADMIN_PASS);
+            const r = await fetch(api.teamDelete(SELECTED_TEAM_ID), { method:'DELETE', body: form });
+            if(!r.ok) throw new Error(await r.text());
+            setStatus('team-status','Deleted');
+          } catch(e){ setStatus('team-status','Failed'); alert(e.message); }
+        };
+      });
+    </script>
+  </body>
+  </html>
+
+

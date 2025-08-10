@@ -1,149 +1,156 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+import os
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from ..database import get_session
-from ..db_models import Match, Team
-import os
+from ..db_models import Match, Team, Rating, MatchQueue
+from ..tasks import recompute_ratings, reset_and_reenqueue_all
 
-from ..tasks import schedule_full_evaluation
-
-ADMIN_SECRET = os.getenv("ADMIN_PASSWORD")
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
-class TeamEntry(BaseModel):
+class TeamRow(BaseModel):
     team_id: str
     name: str
-    wins: int
-    draws: int
-    losses: int
-    matches: int
-    points: int
-    hp_total: int
+    mu: float
+    sigma: float
+    conservative: float
+    wl_last50: Dict[str, int]
+    recent10: str
+    match_ids: List[str]
 
 
 class LeaderboardResponse(BaseModel):
-    teams: List[TeamEntry]
-    pending_matches: int
-    running_matches: int
+    teams: List[TeamRow]
 
 
-async def _get_baseline_ids(session: AsyncSession) -> List[str]:
-    res = await session.execute(select(Team).where(Team.name == "Baseline"))
-    return [str(t.id) for t in res.scalars().all()]
+async def _baseline_ids(session: AsyncSession) -> set[str]:
+    # Include both pinned A/B/C and legacy "Baseline" team created by baseline tests
+    names = ["Baseline", "Baseline-A", "Baseline-B", "Baseline-C"]
+    res = await session.execute(select(Team).where(Team.name.in_(names)))
+    return {str(t.id) for t in res.scalars().all()}
 
 
-async def _aggregate(session: AsyncSession, mode: str) -> LeaderboardResponse:
-    # Identify baseline teams
-    baseline_ids = set(await _get_baseline_ids(session))
+@router.get("")
+async def leaderboard(
+    mode: str,
+    include_baselines: bool = False,
+    x_admin_token: str | None = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
+    if mode not in ("duo", "quad"):
+        raise HTTPException(status_code=400, detail="mode must be 'duo' or 'quad'")
 
-    # Count pending and running matches (excluding baseline)
-    pend_res = await session.execute(select(Match).where(Match.mode == mode, Match.status == "pending"))
-    run_res = await session.execute(select(Match).where(Match.mode == mode, Match.status == "running"))
-    pending_all = [m for m in pend_res.scalars().all()]
-    running_all = [m for m in run_res.scalars().all()]
-    def _exclude_baseline(ms: List[Match]) -> int:
-        c = 0
-        for m in ms:
-            ids = set(m.team_ids.split(","))
-            if not ids.intersection(baseline_ids):
-                c += 1
-        return c
-    pending_matches = _exclude_baseline(pending_all)
-    running_matches = _exclude_baseline(running_all)
+    # Visibility policy
+    baselines_visible = os.getenv("BASELINES_VISIBLE", "false").lower() in ("1", "true", "yes")
+    admin_ok = x_admin_token and x_admin_token == os.getenv("ADMIN_TOKEN")
+    show_baselines = include_baselines and bool(admin_ok)
+    if baselines_visible:
+        show_baselines = True
 
-    # Finished matches excluding baseline
-    result = await session.execute(select(Match).where(Match.mode == mode, Match.status == "finished"))
-    matches_all: List[Match] = result.scalars().all()
-    matches: List[Match] = []
+    # Load ratings for this mode
+    res = await session.execute(select(Rating, Team).join(Team, Team.id == Rating.team_id).where(Rating.mode == mode))
+    rows = res.all()
+
+    baseline_ids = await _baseline_ids(session)
+    entries: List[TeamRow] = []
+
+    # Prepare recent matches for WL and recent form
+    matches_res = await session.execute(select(Match).where(Match.mode == mode, Match.status == "finished").order_by(Match.created_at.desc()))
+    matches_all: List[Match] = matches_res.scalars().all()
+
+    # Index matches per team (limit to last ~200 per team to bound work)
+    per_team_matches: Dict[str, List[Match]] = {}
     for m in matches_all:
-        ids = set(m.team_ids.split(","))
-        if not ids.intersection(baseline_ids):
-            matches.append(m)
+        tids = m.team_ids.split(",")
+        for tid in tids:
+            bucket = per_team_matches.setdefault(tid, [])
+            if len(bucket) < 200:
+                bucket.append(m)
 
-    wins: Dict[str, int] = {}
-    draws: Dict[str, int] = {}
-    matches_played: Dict[str, int] = {}
+    def recent_stats(tid: str) -> tuple[Dict[str, int], str, List[str]]:
+        ms = per_team_matches.get(tid, [])
+        wl = {"wins": 0, "losses": 0}
+        form = []
+        match_ids = []
+        for m in ms[:50]:
+            outcome = None
+            if m.winner_team_id:
+                outcome = "W" if str(m.winner_team_id) == tid else "L"
+            else:
+                outcome = "L"  # draws not expected
+            if outcome == "W":
+                wl["wins"] += 1
+            else:
+                wl["losses"] += 1
+            if len(form) < 10:
+                form.append(outcome)
+            if len(match_ids) < 20:
+                match_ids.append(str(m.id))
+        return wl, " ".join(form), match_ids
 
-    for m in matches:
-        team_ids = m.team_ids.split(",")
-        for tid in team_ids:
-            matches_played[tid] = matches_played.get(tid, 0) + 1
-        if m.winner_team_id:
-            wid = str(m.winner_team_id)
-            wins[wid] = wins.get(wid, 0) + 1
-        else:
-            for tid in team_ids:
-                draws[tid] = draws.get(tid, 0) + 1
-
-    team_ids_all = list(matches_played.keys())
-    if not team_ids_all:
-        return LeaderboardResponse(
-            teams=[],
-            pending_matches=pending_matches,
-            running_matches=running_matches,
-        )
-
-    t_res = await session.execute(select(Team).where(Team.id.in_(team_ids_all)))
-    teams_db: List[Team] = t_res.scalars().all()
-    name_map = {str(t.id): t.name for t in teams_db}
-
-    leaderboard: List[TeamEntry] = []
-    for tid in team_ids_all:
-        hp_total = 0
-        # sum hp from matches
-        for m in matches:
-            if tid in m.team_ids.split(",") and m.team_hp:
-                import json as _j
-                hp_total += _j.loads(m.team_hp).get(tid, 0)
-
-        leaderboard.append(
-            TeamEntry(
-                team_id=tid,
-                name=name_map.get(tid, "<unknown>"),
-                wins=wins.get(tid, 0),
-                draws=draws.get(tid, 0),
-                losses=matches_played[tid] - wins.get(tid, 0),
-                matches=matches_played[tid],
-                points=wins.get(tid,0)*3 + draws.get(tid,0)*1,
-                hp_total=hp_total,
+    for r, t in rows:
+        tid_str = str(t.id)
+        if tid_str in baseline_ids and not show_baselines:
+            continue
+        conservative = float(r.mu - 3.0 * r.sigma)
+        wl, form, mids = recent_stats(tid_str)
+        entries.append(
+            TeamRow(
+                team_id=tid_str,
+                name=t.name,
+                mu=float(r.mu),
+                sigma=float(r.sigma),
+                conservative=conservative,
+                wl_last50=wl,
+                recent10=form,
+                match_ids=mids,
             )
         )
-    leaderboard.sort(key=lambda e: (-e.points, -e.hp_total))
-    return LeaderboardResponse(
-        teams=leaderboard,
-        pending_matches=pending_matches,
-        running_matches=running_matches,
-    )
+
+    # Sort by conservative skill desc
+    entries.sort(key=lambda e: (-e.conservative, e.name.lower()))
+    return {"teams": entries}
 
 
-@router.post("/re-evaluate", status_code=202)
-async def re_evaluate_matches(
-    admin_password: str = Form(...),
-    session: AsyncSession = Depends(get_session)
+@router.get("/pending_running")
+async def pending_running(mode: str, session: AsyncSession = Depends(get_session)):
+    if mode not in ("duo", "quad"):
+        raise HTTPException(status_code=400, detail="mode must be 'duo' or 'quad'")
+    pend_res = await session.execute(select(Match).where(Match.mode == mode, Match.status == "pending"))
+    run_res = await session.execute(select(Match).where(Match.mode == mode, Match.status == "running"))
+    q_res = await session.execute(select(MatchQueue).where(MatchQueue.mode == mode, MatchQueue.status == "queued"))
+    return {
+        "pending": len([*pend_res.scalars().all()]),
+        "running": len([*run_res.scalars().all()]),
+        "queued": len([*q_res.scalars().all()]),
+    }
+
+
+@router.post("/re-compute")
+async def leaderboard_re_compute(
+    x_admin_token: str | None = Header(None),
+    session: AsyncSession = Depends(get_session),
 ):
-    if admin_password != ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid admin password")
-    
-    # Clear existing matches
-    await session.execute(Match.__table__.delete())
-    await session.commit()
-
-    # Enqueue full evaluation scheduling
-    schedule_full_evaluation.apply_async(queue="simulation")
-    return {"status": "queued"}
+    # Require admin token and trigger ratings recompute (replay matches)
+    if not x_admin_token or x_admin_token != os.getenv("ADMIN_TOKEN"):
+        raise HTTPException(status_code=403, detail="admin token required")
+    task = recompute_ratings.apply_async(queue="simulation")
+    return {"status": "queued", "task_id": task.id}
 
 
-@router.get("/duo", response_model=LeaderboardResponse)
-async def leaderboard_duo(session: AsyncSession = Depends(get_session)):
-    return await _aggregate(session, "duo")
+@router.post("/re-evaluate")
+async def leaderboard_re_evaluate(
+    x_admin_token: str | None = Header(None),
+):
+    # Dangerous: resets matches/queue/ratings, then enqueues calibration for all teams
+    if not x_admin_token or x_admin_token != os.getenv("ADMIN_TOKEN"):
+        raise HTTPException(status_code=403, detail="admin token required")
+    task = reset_and_reenqueue_all.apply_async(queue="simulation")
+    return {"status": "queued", "task_id": task.id}
 
-
-@router.get("/quad", response_model=LeaderboardResponse)
-async def leaderboard_quad(session: AsyncSession = Depends(get_session)):
-    return await _aggregate(session, "quad") 

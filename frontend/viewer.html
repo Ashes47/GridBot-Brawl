@@ -55,8 +55,9 @@
     /* Left Panel Styling */
     #left-panel { 
       width: 100%;
-      max-height: 650px;
-      overflow: hidden;
+      /* Use viewport height so inner content can scroll fully to bottom controls */
+      max-height: 82vh;
+      overflow: visible;
       text-align: left;
       border-radius: 16px;
       background: rgba(30, 41, 59, 0.85);
@@ -82,10 +83,11 @@
     }
     .panel-content {
       padding: 20px 24px;
-      max-height: calc(650px - 60px);
+      /* Match outer panel height minus header, keep an internal scroller */
       overflow-y: auto;
       border: none;
       background: transparent;
+      padding-bottom: 28px; /* ensure bottom controls are not clipped */
     }
     .tabs {
       display: flex;
@@ -547,7 +549,9 @@
       background: rgba(30, 41, 59, 0.85);
       backdrop-filter: blur(12px);
       border-radius: 12px;
-      width: 100%;
+      /* Match controls container width and alignment */
+      width: 150%;
+      margin-left: -25%;
       margin-top: 16px;
       box-shadow: 0 6px 24px rgba(0,0,0,0.2);
       border: 1px solid rgba(71, 85, 105, 0.3);
@@ -839,6 +843,7 @@
             <div class="control-section">
               <button id="prevEvent" class="action-btn">Prev Event</button>
               <button id="nextEvent" class="action-btn">Next Event</button>
+              <button id="playEvents" class="action-btn">⚡ Play Events</button>
             </div>
             
             <div class="control-section">
@@ -1249,15 +1254,9 @@
       showEndPanel();
     };
     // Play events only
-    const btnPlayEvents = document.createElement('button');
-    btnPlayEvents.textContent = '⚡ Play Events';
-    btnPlayEvents.className = 'action-btn';
-    btnPlayEvents.onclick = ()=>{ playEventsOnly = true; playing=true; animStart=performance.now(); if(!rafId) rafId=requestAnimationFrame(step); };
-    
-    // Find the second control group and append the button
-    const controlGroups = document.querySelectorAll('.control-group');
-    if (controlGroups[1]) {
-      controlGroups[1].appendChild(btnPlayEvents);
+    const playEventsBtn = document.getElementById('playEvents');
+    if (playEventsBtn) {
+      playEventsBtn.onclick = ()=>{ playEventsOnly = true; playing = true; animStart = performance.now(); if (!rafId) rafId = requestAnimationFrame(step); };
     }
     document.getElementById('reverse').onclick = ()=>{ reverseMode = !reverseMode; };
     document.getElementById('loop').onclick = ()=>{ loopMode = !loopMode; document.getElementById('loop').style.opacity = loopMode ? '1' : '0.7'; };
@@ -2035,6 +2034,10 @@
       rafId = requestAnimationFrame(step);
     }
 
+    let logAutoScroll = true;
+    let userScrollingLog = false;
+    let userScrollTimer = null;
+
     function buildLog(filters={}) {
       const searchTerm = (filters.query||'').toLowerCase().trim();
       const onlyEvents = !!filters.onlyEvents;
@@ -2054,9 +2057,10 @@
           ul.style.margin = '4px 0 8px 16px';
           ul.style.padding = '0';
           list.forEach(e => {
-            let text = e.replace(/\b([0-9a-f]{6})-(sn|ta|bo|sc|te)\b/gi, (m, pfx, role)=>{
+            // Replace any bot id like abcdef-xy (role code) with TeamName Role using metadata
+            let text = e.replace(/\b([0-9a-f]{6})-([a-z]{2})\b/gi, (m, pfx, role)=>{
               const tm = teamsMeta.find(t=>t.prefix===pfx);
-              const roleName = {sn:'Sniper', ta:'Tank', bo:'Bomber', sc:'Scout', te:'Teleporter'}[role]||role;
+              const roleName = (META_BY_CODE[role]?.name) || role;
               return `${tm?tm.name:pfx} ${roleName}`;
             });
             if (searchTerm && !text.toLowerCase().includes(searchTerm)) return;
@@ -2072,6 +2076,22 @@
           frag.appendChild(container);
         }
       });
+      // Inject auto-scroll toggle and scroll listeners once
+      if (!document.getElementById('log-autoscroll-toggle')){
+        const wrap = document.createElement('div');
+        wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='space-between'; wrap.style.margin='6px 0';
+        const label = document.createElement('label'); label.style.fontSize='12px'; label.style.color='#94a3b8';
+        const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=true; cb.id='log-autoscroll-toggle'; cb.style.marginRight='6px';
+        label.appendChild(cb); label.appendChild(document.createTextNode(' Auto-scroll log'));
+        wrap.appendChild(label);
+        logDiv.parentElement.insertBefore(wrap, logDiv);
+        cb.addEventListener('change', ()=>{ logAutoScroll = cb.checked; });
+        const arm = ()=>{ userScrollingLog = true; if (userScrollTimer) clearTimeout(userScrollTimer); userScrollTimer = setTimeout(()=>{ userScrollingLog=false; }, 1500); };
+        logDiv.addEventListener('wheel', arm, { passive:true });
+        logDiv.addEventListener('touchstart', arm, { passive:true });
+        logDiv.addEventListener('scroll', arm, { passive:true });
+      }
+
       logDiv.innerHTML='';
       logDiv.appendChild(frag);
     }
@@ -2084,16 +2104,14 @@
       const el = document.getElementById(`log-turn-${tick}`);
       if (!el) return;
       el.classList.add('highlight');
-      // Auto-scroll to keep current turn visible
+      // Auto-scroll to keep current turn visible (respect toggle and user scroll)
+      if (!logAutoScroll || userScrollingLog) return;
       const top = el.offsetTop;
       const bottom = top + el.offsetHeight;
       const viewTop = logDiv.scrollTop;
       const viewBottom = viewTop + logDiv.clientHeight;
-      if (top < viewTop) {
-        logDiv.scrollTo({ top: Math.max(0, top - 12), behavior: 'smooth' });
-      } else if (bottom > viewBottom) {
-        logDiv.scrollTo({ top: bottom - logDiv.clientHeight + 12, behavior: 'smooth' });
-      }
+      if (top < viewTop) logDiv.scrollTop = Math.max(0, top - 12);
+      else if (bottom > viewBottom) logDiv.scrollTop = bottom - logDiv.clientHeight + 12;
     }
 
     function nearestBotIdAtCanvas(x, y) {

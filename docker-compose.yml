@@ -45,7 +45,7 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "baseline", "--concurrency", "2", "-P", "threads", "-n", "baseline@%h"]
+    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "baseline", "--concurrency", "${WORKER_BASE_CONCURRENCY:-2}", "-P", "threads", "-n", "baseline@%h"]
     depends_on:
       - backend
       - redis
@@ -63,7 +63,7 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "simulation", "--concurrency", "4", "-P", "threads", "-n", "simulation@%h"]
+    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "simulation", "--concurrency", "${WORKER_SIM_CONCURRENCY:-4}", "-P", "threads", "-n", "simulation@%h"]
     depends_on:
       - backend
       - redis
@@ -71,6 +71,20 @@ services:
       - ./data/teams:/app/data/teams
       - ./data/matches:/app/data/matches
       - ./maps:/app/maps
+    networks:
+      - botnet
+
+  worker-beat:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+    command: ["celery", "-A", "app.celery_app.celery_app", "beat", "--pidfile=", "--loglevel=INFO"]
+    depends_on:
+      - backend
+      - redis
     networks:
       - botnet
 

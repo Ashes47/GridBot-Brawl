@@ -40,8 +40,17 @@ FLOWER_PASSWORD=adminchangeme
 
 Notes:
 - The `docker-compose.yml` expects these variables via `.env`.
-- The backend also reads `DATABASE_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, and `ADMIN_PASSWORD`.
-- If you change `POSTGRES_*`, keep `DATABASE_URL` in sync.
+- The backend also reads:
+  - `DATABASE_URL`, `SYNC_DATABASE_URL`
+  - `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `REDIS_URL`
+  - Admin: `ADMIN_TOKEN` (for admin APIs), `ADMIN_PASSWORD` (legacy team admin only)
+  - Feature flags: `ENABLE_DUO`, `ENABLE_QUAD`, `BASELINE_ENABLED`, `BASELINES_VISIBLE`
+  - Scheduler: `MAX_REPEAT_WINDOW_HOURS`, `DAILY_DUO`, `DAILY_QUAD`, `BAND_WIDTH_DUO`, `BAND_WIDTH_QUAD`, calibration knobs
+  - Dynamic quotas: `SIGMA_TARGET`, `EXTRA_MATCH_PER_SIGMA`, `MAX_DAILY_EXTRA`, `MAX_DAILY_DUO`, `MAX_DAILY_QUAD`
+  - Rate limits: `RATE_LIMIT_SUBMIT_EVAL_SECONDS`
+  - Boot: `RESET_DB`, `SEED_BASELINES_ON_START`, `ENABLE_CELERY_BEAT`
+  - Maps: `MAP_RULES_PATH`, `FORCE_MAP_SEED`
+  - If you change `POSTGRES_*`, keep `DATABASE_URL` in sync.
 
 ## Run with Docker
 ```
@@ -103,7 +112,7 @@ Tip: The FastAPI app auto-creates tables at startup.
 - Run duo simulation: `POST /simulate/duo` with body `{ "team_ids": ["<id1>", "<id2>"] }`.
 - Get match info: `GET /matches/{match_id}`.
 - Download match log JSON: `GET /matches/{match_id}/log`.
-- Leaderboards: `GET /leaderboard/duo`, `GET /leaderboard/quad`.
+- Leaderboard: `GET /leaderboard?mode=duo|quad` (returns TrueSkill ratings: μ, σ, conservative score (μ-3σ), recent W-L, recent form).
 - Baseline test: `POST /simulate/vs_baseline` with `{ "team_id": "<id>", "baseline_roster": ["sniper",...]} (optional)`.
 
 ### Components catalog
@@ -127,6 +136,36 @@ If these folders are missing or unwritable, uploads and match logs will fail.
 - Celery tasks not running: confirm Redis is reachable (`CELERY_BROKER_URL`) and workers are up for queues `baseline` and `simulation`.
 - Log download 404: check the file exists under `data/matches/` and container paths match host volumes.
 - CORS during local dev: the API allows `http://localhost:8080` by default.
+
+## Ranking and Scheduling (for developers)
+
+We use TrueSkill (per mode) and a match scheduler to keep the board fresh and fair. See `RANKING.md` for deep details.
+
+- Ratings per team per mode: `(mu, sigma)` initialized to `mu=25.0`, `sigma≈8.333`.
+- Leaderboard score: conservative skill `mu - 3*sigma`.
+- Updates: after each finished match using `trueskill.rate` (DUO as two teams; QUAD with ranks).
+- QUAD ranking policy: survivors rank above eliminated; among survivors, higher total HP breaks ties, then total damage; remaining ties resolved deterministically by match id.
+- Baselines A/B/C are rated but hidden publicly by default (`BASELINES_VISIBLE=false`), used for calibration and drift checks.
+
+Scheduling overview:
+- On submit-for-evaluation, we enqueue a calibration batch:
+  - DUO: baselines + nearby opponents; adaptive follow-ups within bands and gap caps
+  - QUAD (if enabled): baseline pods + nearby pods
+- Ongoing scheduler targets daily quotas per team per mode with banded sampling (70/20/10 near/above-below/baseline) and repeat suppression.
+- Per-team per-mode concurrency enforced; queue consumers run periodically (via Celery beat).
+
+Maintenance:
+- Sigma inflation: inactive teams gain +0.5 σ per 7 days, capped at initial σ.
+- Admin can recompute ratings by replaying match history: `POST /leaderboard/re-evaluate` with `X-Admin-Token`.
+
+## Scaling to 500+ teams
+
+- Periodic queue consumer (Celery beat) processes matches continuously.
+- Ongoing quotas: DUO≈(teams×DAILY_DUO)/2 per day; QUAD≈(teams×DAILY_QUAD)/4 per day.
+- Per‑team per‑mode concurrency guard prevents overload on hot teams.
+- Baselines available to fill when the pool is small or uneven.
+- Redis + Celery recommended with separate DB indices for cache vs workers.
+- DB indexes applied at startup to keep queries fast.
 
 ## Map system
 

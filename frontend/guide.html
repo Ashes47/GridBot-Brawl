@@ -381,13 +381,25 @@
     document.getElementById('close').onclick = () => { modal.style.display = 'none'; };
   </script>
 
-  <h2 id="scoring">Scoring &amp; Leaderboard</h2>
+  <h2 id="scoring">Ranking &amp; Leaderboard (Player Guide)</h2>
+  <p>
+    We use a proven system called <strong>TrueSkill</strong> to rank teams. Think of it as:
+    <br/>
+    <strong>Skill</strong> (how strong your team has shown to be) and <strong>Uncertainty</strong> (how sure we are).
+    Your visible rank uses a safety‑first <strong>Final Score</strong> = Skill − 3 × Uncertainty.
+  </p>
   <ul>
-    <li>Win = <strong>3</strong> points</li>
-    <li>Draw = <strong>1</strong> point</li>
-    <li>Loss = 0 points</li>
-    <li>Tie-breakers: total team HP remaining.</li>
+    <li><strong>New teams</strong> start at Skill 25 with some Uncertainty. Win matches to increase Skill and reduce Uncertainty.</li>
+    <li><strong>Final Score</strong> goes up faster when you beat strong opponents, and settles as Uncertainty drops.</li>
+    <li><strong>Duo vs Quad</strong>: You have separate ratings for each mode.</li>
+    <li><strong>Quad placements</strong>: Survivors outrank eliminated; ties use total HP, then total damage. Remaining ties are broken consistently.</li>
+    <li><strong>Baselines</strong>: We use three fixed teams (A/B/C) to calibrate newcomers and verify drift. They don’t crowd the public board.</li>
+    <li><strong>Recent form</strong>: See your last 10 results (W/L) and your W‑L over the last 50.</li>
   </ul>
+  <p>
+    Clicking <strong>Submit for Evaluation</strong> schedules a short calibration set against baselines and similarly rated teams.
+    After that, our scheduler keeps your rating fresh with daily matchups—mostly near your rank, with some exploration.
+  </p>
 
   <p><a href="index.html">← Back to home</a></p>
   </main>

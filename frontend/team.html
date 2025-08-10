@@ -249,12 +249,7 @@
       text-decoration: underline;
     }
     
-    .admin-actions {
-      text-align: right;
-      margin-top: 32px;
-      padding-top: 24px;
-      border-top: 1px solid rgba(71, 85, 105, 0.3);
-    }
+    
   </style>
 </head>
 <body>
@@ -313,6 +308,7 @@
     <div class="action-section">
       <button id="submit-eval">Submit for evaluation</button>
       <span id="eval-status" style="color:#94a3b8;"></span>
+      <span id="queue-status" class="pill" title="Pending/running matches for this team today"></span>
     </div>
 
   <h3>Duo Matches</h3>
@@ -339,10 +335,7 @@
     <tbody></tbody>
   </table>
 
-    <div class="admin-actions">
-      <button id="reset-btn" style="background:#ef4444;">Admin Reset Password</button>
-      <button id="delete-btn" style="background:#ef4444; margin-left: 10px;">Admin Delete Team</button>
-    </div>
+    
   </div>
 
   <script>
@@ -424,34 +417,14 @@
         tr.innerHTML=`<td>${m.is_baseline ? b++ : (m.mode==='duo'?d++:q++)}</td><td>${badge}</td><td>${oppText}</td><td>${m.hp_left}</td><td>${m.damage_done ?? 0}</td><td><a href="viewer.html?id=${m.match_id}" target="_blank">🔗</a></td>`;
         if (m.is_baseline) baseBody.appendChild(tr); else (m.mode==='duo'?duoBody:quadBody).appendChild(tr);
       });
-      document.getElementById('reset-btn').onclick = async ()=>{
-        const adminPass = prompt('Enter admin password');
-        if(!adminPass) return;
-        const newPass = prompt('Enter new team password (min 6 chars)');
-        if(!newPass) return;
-        const form = new FormData();
-        form.append('admin_password', adminPass);
-        form.append('new_password', newPass);
-        const res = await fetch(`http://localhost:8000/teams/${teamId}/reset_password`, {method:'POST', body:form});
-        if(res.ok) alert('Password reset'); else alert('Failed: '+(await res.text()));
-      };
-      document.getElementById('delete-btn').onclick = async () => {
-        const adminPass = prompt('Enter admin password to delete team');
-        if (!adminPass) return;
-        if (!confirm('Are you sure you want to delete this team? This cannot be undone.')) return;
-        
-        const form = new FormData();
-        form.append('admin_password', adminPass);
-        
-        const res = await fetch(`http://localhost:8000/teams/${teamId}`, { method: 'DELETE', body: form });
-        if (res.ok) {
-          alert('Team deleted');
-          window.location.href = 'teams.html';
-        } else {
-          alert('Failed: ' + (await res.text()));
-        }
-      };
-      // page already populated above; no extra call
+      
+      // Queue status for this team (count of pending+running today)
+      try {
+        const pr = await fetch(`http://localhost:8000/teams/${teamId}/queue_status`).then(r=>r.json());
+        document.getElementById('queue-status').textContent = `${pr.queued || 0} queued • ${pr.pending || 0} pending • ${pr.running || 0} running`;
+      } catch (e) {
+        document.getElementById('queue-status').textContent = '';
+      }
 
       // Test vs Baseline
       document.getElementById('test-baseline').onclick = async () => {

@@ -14,7 +14,10 @@ from passlib.hash import bcrypt
 
 from ..database import get_session
 from ..db_models import Member, Team
-from ..tasks import schedule_evaluation_for_team
+from ..tasks import schedule_calibration_for_team
+import os
+from redis import asyncio as aioredis
+from datetime import datetime
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -22,7 +25,7 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 DATA_DIR = Path(os.getenv("DATA_DIR", "./data/teams"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-MAX_FILE_SIZE_BYTES = 32 * 1024  # 32 KB limit
+MAX_FILE_SIZE_BYTES = 256 * 1024  # 256 KB limit
 
 # mapping from component key to expected class name in code
 COMPONENT_CLASS_NAME = {
@@ -75,6 +78,25 @@ def _extract_class_names_in_order(code: str) -> List[str]:
     except SyntaxError as exc:
         raise HTTPException(status_code=400, detail=f"Syntax error: {exc}") from exc
     return [node.name for node in getattr(tree, 'body', []) if isinstance(node, ast.ClassDef)]
+
+
+# ---------------- Rate limiting helpers ----------------
+
+async def _check_submit_eval_rate_limit(team_id: str) -> int | None:
+    """Returns remaining seconds to wait if limited, else None. Uses RATE_LIMIT_SUBMIT_EVAL_SECONDS only."""
+    url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    client = aioredis.from_url(url, decode_responses=True)
+    secs = int(os.getenv("RATE_LIMIT_SUBMIT_EVAL_SECONDS"))
+    ttl = max(1, secs)
+    key = f"rate:submit_eval:{team_id}"
+    try:
+        ok = await client.set(key, "1", nx=True, ex=ttl)
+        if ok:
+            return None
+        rem = await client.ttl(key)
+        return int(rem if rem and rem > 0 else ttl)
+    finally:
+        await client.close()
 
 
 def _validate_roster_json(roster_json: str) -> List[str]:
@@ -356,8 +378,11 @@ async def list_teams(search: str | None = None, limit: int = 100, session: Async
         .group_by(Team.id)
         .order_by(Team.created_at.desc())
     )
-    # exclude Baseline from directory
-    query = query.where(Team.name != "Baseline")
+    # Exclude baselines from directory when BASELINES_VISIBLE=false
+    show_baselines = os.getenv("BASELINES_VISIBLE", "false").lower() in ("1","true","yes")
+    if not show_baselines:
+        baseline_names = ["Baseline", "Baseline-A", "Baseline-B", "Baseline-C"]
+        query = query.where(~Team.name.in_(baseline_names))
     if search:
         query = query.where(Team.name.ilike(f"%{search}%"))
     result = await session.execute(query.limit(limit))
@@ -428,9 +453,30 @@ async def team_matches(team_id: str, session: AsyncSession = Depends(get_session
                 "hp_left": hp_map.get(team_id, 0),
                 "damage_done": dmg_map.get(team_id, 0),
                 "is_baseline": is_baseline,
+                "map_name": m.map_name,
+                "map_seed": m.map_seed,
+                "ranks_order": [str(t) for t in (m.ranks_order or [])],
+                "ranks_map": m.ranks_map,
+                "trueskill_delta": None,
             }
         )
     return data
+
+
+@router.get("/{team_id}/queue_status")
+async def team_queue_status(team_id: str, session: AsyncSession = Depends(get_session)):
+    """Return counts of pending and running matches for this team since midnight UTC."""
+    try:
+        tid = uuid.UUID(team_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Invalid team id")
+
+    from ..db_models import Match, MatchQueue
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    pend = await session.execute(select(Match).where(Match.team_ids.like(f"%{tid}%"), Match.status == "pending", Match.created_at >= today))
+    run = await session.execute(select(Match).where(Match.team_ids.like(f"%{tid}%"), Match.status == "running", Match.created_at >= today))
+    queued = await session.execute(select(MatchQueue).where(MatchQueue.team_ids.any(tid), MatchQueue.status == "queued"))
+    return {"pending": len([*pend.scalars().all()]), "running": len([*run.scalars().all()]), "queued": len([*queued.scalars().all()])}
 
 
 @router.post("/{team_id}/submit_for_evaluation")
@@ -450,7 +496,14 @@ async def submit_for_evaluation(team_id: str, password: str = Form(...), session
     if not bcrypt.verify(password, team.password_hash):
         raise HTTPException(status_code=403, detail="Invalid password")
 
-    # enqueue simulation scheduling (no back-compat background tasks)
-    schedule_evaluation_for_team.apply_async(args=[team_id], queue="simulation")
+    # Rate-limit submit for evaluation by team (configurable hours)
+    limited_secs = await _check_submit_eval_rate_limit(team_id)
+    if limited_secs is not None:
+        from fastapi import Response
+        # send 429 with Retry-After
+        raise HTTPException(status_code=429, detail=f"Submit for evaluation allowed again in {limited_secs} seconds")
+
+    # enqueue calibration scheduling (DUO-first, QUAD if enabled)
+    schedule_calibration_for_team.apply_async(args=[team_id], queue="simulation")
 
     return {"status": "queued"}

@@ -203,11 +203,20 @@
     
     <div class="status-bar">
       <div id="status" class="status-text"></div>
-      <button id="re-eval-btn">Admin Re-evaluate</button>
     </div>
     
     <table>
-      <thead><tr><th>Rank</th><th>Team Name</th><th>W/L/D</th><th>Points</th><th>HP Total</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Team</th>
+          <th title="Final Score = Skill − 3 × Uncertainty">Final Score</th>
+          <th title="Skill estimate (higher is better)">Skill</th>
+          <th title="Uncertainty (lower is better)">Uncertainty</th>
+          <th>W-L (last 50)</th>
+          <th>Recent (10)</th>
+        </tr>
+      </thead>
       <tbody id="tbody"></tbody>
     </table>
   </div>
@@ -222,39 +231,35 @@
       // Update active mode styling
       document.getElementById('duo-link').classList.toggle('active', mode === 'duo');
       document.getElementById('quad-link').classList.toggle('active', mode === 'quad');
-      const res = await fetch(`http://localhost:8000/leaderboard/${mode}`);
+      const res = await fetch(`http://localhost:8000/leaderboard?mode=${mode}`);
       const data = await res.json();
       const tbody = document.getElementById('tbody');
       tbody.innerHTML='';
-      data.teams.forEach((t, idx) => {
+      (data.teams || []).forEach((t, idx) => {
         const tr = document.createElement('tr');
         const rankClass = idx === 0 ? 'rank1' : idx === 1 ? 'rank2' : idx === 2 ? 'rank3' : '';
         tr.className = rankClass;
-        tr.innerHTML = `<td class="rank-number">${idx+1}</td><td><a href="team.html?id=${t.team_id}" target="_blank">${t.name}</a></td><td>${t.wins}/${t.losses}/${t.draws}</td><td>${t.points}</td><td>${t.hp_total}</td>`;
+        const wl = t.wl_last50 ? `${t.wl_last50.wins || 0}-${t.wl_last50.losses || 0}` : '0-0';
+        tr.innerHTML = `
+          <td class="rank-number">${idx+1}</td>
+          <td><a href="team.html?id=${t.team_id}" target="_blank">${t.name}</a></td>
+          <td>${(t.conservative ?? 0).toFixed(2)}</td>
+          <td>${(t.mu ?? 0).toFixed(2)}</td>
+          <td>${(t.sigma ?? 0).toFixed(2)}</td>
+          <td>${wl}</td>
+          <td>${t.recent10 || ''}</td>
+        `;
         tbody.appendChild(tr);
       });
-      // update status
+      // update status: pending/running counts
       const statusDiv = document.getElementById('status');
-      statusDiv.textContent = `${data.pending_matches} pending matches • ${data.running_matches} running matches`;
+      const pr = await fetch(`http://localhost:8000/leaderboard/pending_running?mode=${mode}`).then(r=>r.json()).catch(()=>({pending:0,running:0,queued:0}));
+      statusDiv.textContent = `${(data.teams || []).length} teams • ${pr.queued} queued • ${pr.pending} pending • ${pr.running} running`;
       
       // Update page title
       document.querySelector('h1').textContent = mode === 'duo' ? 'Duo Leaderboard' : 'Quad Leaderboard';
     }
-    document.getElementById('re-eval-btn').onclick = async () => {
-      const adminPass = prompt('Enter admin password to re-evaluate all matches');
-      if (!adminPass) return;
-      
-      const form = new FormData();
-      form.append('admin_password', adminPass);
-
-      const res = await fetch('http://localhost:8000/leaderboard/re-evaluate', { method: 'POST', body: form });
-      if (res.ok) {
-        alert('Re-evaluation started. Refresh to see progress.');
-        load();
-      } else {
-        alert('Failed: ' + (await res.text()));
-      }
-    };
+    
     load();
   </script>
 </body>

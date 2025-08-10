@@ -59,6 +59,8 @@ async def get_match(match_id: str, session: AsyncSession = Depends(get_session))
         "status": match.status,
         "map_name": match.map_name,
         "map_seed": match.map_seed,
+        "ranks_order": [str(t) for t in (match.ranks_order or [])],
+        "ranks_map": match.ranks_map,
     }
 
 
@@ -109,6 +111,7 @@ async def list_matches(limit: int = 50, session: AsyncSession = Depends(get_sess
             "status": m.status,
             "map_name": m.map_name,
             "map_seed": m.map_seed,
+            "ranks_order": [str(t) for t in (m.ranks_order or [])],
         }
         for m in matches
     ]

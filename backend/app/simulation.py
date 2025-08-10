@@ -74,8 +74,9 @@ async def _load_teams(session: AsyncSession, team_ids: List[str]):
 # ---------------- Spawning helpers ----------------
 
 def _spawn_positions_duo() -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
-    top = [(1, 0), (3, 0), (5, 0), (7, 0), (9, 0)]
-    bottom = [(1, 9), (3, 9), (5, 9), (7, 9), (9, 9)]
+    # Default 10x10 grid fallback: evenly spaced on first and last rows
+    top = [(0, 0), (2, 0), (4, 0), (6, 0), (8, 0)]
+    bottom = [(0, 9), (2, 9), (4, 9), (6, 9), (8, 9)]
     return top, bottom
 
 
@@ -237,7 +238,7 @@ class _SandboxManager:
 # ---------------- Main simulation ----------------
 
 
-async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int | None = None):
+async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int | None = None, match_id: str | None = None):
     mode = "duo" if len(team_ids) == 2 else "quad" if len(team_ids) == 4 else None
     if not mode:
         raise ValueError("Only 2 or 4 teams supported")
@@ -250,12 +251,21 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
     ms = generate_map(mode, seed, rules)
     grid_size = ms.grid_size_for_mode(mode, GRID_DUO, GRID_QUAD)
     # Build spawn positions list in engine format (list per team index)
-    if mode == "duo" and ms.spawn_positions and mode in ms.spawn_positions:
-        sp = ms.spawn_positions[mode]
-        pos_lists = [sp.get("teamA", _spawn_positions_duo()[0]), sp.get("teamB", _spawn_positions_duo()[1])]
-    elif mode == "quad" and ms.spawn_positions and mode in ms.spawn_positions:
-        sp = ms.spawn_positions[mode]
-        pos_lists = [sp.get("teamA"), sp.get("teamB"), sp.get("teamC"), sp.get("teamD")]
+    pos_lists: List[List[Tuple[int, int]]]
+    if ms.spawn_positions:
+        # Accept both nested (by mode) and flat schemas
+        sp = None
+        if isinstance(ms.spawn_positions, dict) and mode in ms.spawn_positions and isinstance(ms.spawn_positions[mode], dict):
+            sp = ms.spawn_positions[mode]
+        elif isinstance(ms.spawn_positions, dict) and "teamA" in ms.spawn_positions:
+            sp = ms.spawn_positions  # flat
+        if mode == "duo" and sp:
+            a, b = _spawn_positions_duo()
+            pos_lists = [sp.get("teamA", a), sp.get("teamB", b)]
+        elif mode == "quad" and sp:
+            pos_lists = [sp.get("teamA"), sp.get("teamB"), sp.get("teamC"), sp.get("teamD")]
+        else:
+            pos_lists = _spawn_positions_duo() if mode == "duo" else _spawn_positions_quad()
     else:
         pos_lists = _spawn_positions_duo() if mode == "duo" else _spawn_positions_quad()
 
@@ -353,6 +363,8 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
     sandbox = _SandboxManager(team_files, bot_class_map)
     damage_done_total: Dict[str, int] = {tid: 0 for tid in team_ids}
     damage_by_bot_total: Dict[str, int] = {}
+    # Track elimination turn for each team (None if survived to end)
+    team_elimination_turn: Dict[str, int | None] = {tid: None for tid in team_ids}
 
     while turn < TURN_LIMIT and not winner_team_id:
         actions = sandbox.decide_actions(state)
@@ -529,23 +541,42 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
                 "events": events,
             }
         )
-        # check win condition
+        # check win condition and update elimination turns
         alive_by_team: Dict[str, List[Bot]] = {}
         for b in state.all_bots():
             alive_by_team.setdefault(b.team_id, []).append(b)
+        # Record elimination turn when a team reaches 0 alive for the first time
+        for tid in team_ids:
+            if team_elimination_turn[tid] is None and tid not in alive_by_team:
+                team_elimination_turn[tid] = turn
         if len(alive_by_team) == 1:
             winner_team_id = next(iter(alive_by_team))
         turn += 1
 
-    # timeout tiebreaker
+    # timeout tiebreaker (no draws): determine winner via HP, then damage, then deterministic random
     if not winner_team_id:
-        team_hp = {
-            team_id: sum(b.hp for b in bots) for team_id, bots in alive_by_team.items()
-        }
-        max_hp = max(team_hp.values())
-        winners = [tid for tid, hp in team_hp.items() if hp == max_hp]
-        if len(winners) == 1:
-            winner_team_id = winners[0]
+        # Compute alive_by_team from final state
+        alive_by_team = {}
+        for b in state.all_bots():
+            alive_by_team.setdefault(b.team_id, []).append(b)
+        team_hp_now = {team_id: sum(b.hp for b in bots) for team_id, bots in alive_by_team.items()}
+        if team_hp_now:
+            max_hp = max(team_hp_now.values())
+            candidates = [tid for tid, hp in team_hp_now.items() if hp == max_hp]
+            if len(candidates) == 1:
+                winner_team_id = candidates[0]
+            else:
+                # tie on HP: use total damage dealt
+                max_dmg = max(damage_done_total.get(tid, 0) for tid in candidates)
+                dmg_candidates = [tid for tid in candidates if damage_done_total.get(tid, 0) == max_dmg]
+                if len(dmg_candidates) == 1:
+                    winner_team_id = dmg_candidates[0]
+                else:
+                    # deterministic random using match seed
+                    import random as _rand
+                    _rng = _rand.Random(int(ms.seed) if ms.seed is not None else 0)
+                    _rng.shuffle(dmg_candidates)
+                    winner_team_id = dmg_candidates[0]
 
     # Compute final hp per team
     final_hp = {tid: 0 for tid in team_ids}
@@ -567,6 +598,7 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
             "name": ms.name,
             "seed": ms.seed,
             "size": ms.size,
+            "spawn_positions": getattr(ms, 'spawn_positions', None),
             "static_walls": ms.static_walls,
             "terrain": [{"type": t.type, "pos": list(t.pos)} for t in ms.terrain],
             "zones": [{"type": z.type, "pos": list(z.pos)} for z in ms.zones],
@@ -574,6 +606,92 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
     }
     log_with_tail = [map_header] + log + [summary]
     log_path.write_text(json.dumps(log_with_tail), encoding="utf-8")
+
+    # Build ranks per spec
+    # Survivors first (no elimination turn), then eliminated by later death better
+    survivors = [tid for tid in team_ids if team_elimination_turn.get(tid) is None]
+    eliminated = [tid for tid in team_ids if team_elimination_turn.get(tid) is not None]
+
+    # Sort helpers with deterministic randomness based on match_id when provided (fallback: map seed)
+    import random as _rand, hashlib as _hash
+    if match_id is not None:
+        try:
+            _seed_base = int(_hash.sha256(match_id.encode("utf-8")).hexdigest()[:8], 16)
+        except Exception:
+            _seed_base = int(ms.seed) if ms.seed is not None else 0
+    else:
+        _seed_base = int(ms.seed) if ms.seed is not None else 0
+
+    def sort_survivors(tids: List[str]) -> List[str]:
+        # group by hp, damage for potential equal ranks
+        def key(tid: str):
+            return (-final_hp.get(tid, 0), -damage_done_total.get(tid, 0))
+        tids_sorted = sorted(tids, key=key)
+        # break display-order ties deterministically
+        i = 0
+        out: List[str] = []
+        while i < len(tids_sorted):
+            j = i + 1
+            while j < len(tids_sorted) and key(tids_sorted[j]) == key(tids_sorted[i]):
+                j += 1
+            group = tids_sorted[i:j]
+            rng = _rand.Random((_seed_base + len(group) + i) & 0xFFFFFFFF)
+            rng.shuffle(group)
+            out.extend(group)
+            i = j
+        return out
+
+    def sort_eliminated(tids: List[str]) -> List[str]:
+        def key(tid: str):
+            return (-(team_elimination_turn.get(tid) or -1), -damage_done_total.get(tid, 0))
+        tids_sorted = sorted(tids, key=key)
+        i = 0
+        out: List[str] = []
+        while i < len(tids_sorted):
+            j = i + 1
+            while j < len(tids_sorted) and key(tids_sorted[j]) == key(tids_sorted[i]):
+                j += 1
+            group = tids_sorted[i:j]
+            rng = _rand.Random((_seed_base + 1000 + len(group) + i) & 0xFFFFFFFF)
+            rng.shuffle(group)
+            out.extend(group)
+            i = j
+        return out
+
+    survivors_sorted = sort_survivors(survivors)
+    eliminated_sorted = sort_eliminated(eliminated)
+    ranks_order: List[str] = survivors_sorted + eliminated_sorted
+
+    # Build ranks_map with competition ranking (equal metrics => equal rank)
+    ranks_map: Dict[str, int] = {}
+    current_rank = 0
+
+    def assign_group(group: List[str]):
+        nonlocal current_rank
+        for tid in group:
+            ranks_map[tid] = current_rank
+        current_rank += len(group)
+
+    # Survivors groups by (hp, damage)
+    def group_by_key(tids: List[str], key_func):
+        if not tids:
+            return []
+        groups: List[List[str]] = []
+        i = 0
+        sorted_tids = sorted(tids, key=key_func)
+        while i < len(sorted_tids):
+            j = i + 1
+            while j < len(sorted_tids) and key_func(sorted_tids[j]) == key_func(sorted_tids[i]):
+                j += 1
+            groups.append(sorted_tids[i:j])
+            i = j
+        return groups
+
+    for grp in group_by_key(survivors_sorted, lambda tid: (-final_hp.get(tid, 0), -damage_done_total.get(tid, 0))):
+        assign_group(grp)
+    # Eliminated groups by (elim_turn, damage)
+    for grp in group_by_key(eliminated_sorted, lambda tid: (team_elimination_turn.get(tid), -damage_done_total.get(tid, 0))):
+        assign_group(grp)
 
     return {
         "winner_team_id": winner_team_id,
@@ -584,6 +702,8 @@ async def simulate_match(session: AsyncSession, team_ids: List[str], seed: int |
         "damage_by_bot": damage_by_bot_total,
         "map_name": ms.name,
         "map_seed": int(ms.seed) if ms.seed is not None else None,
+        "ranks_order": ranks_order,
+        "ranks_map": ranks_map,
     }
 
 

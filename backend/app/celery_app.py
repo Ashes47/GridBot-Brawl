@@ -1,5 +1,6 @@
 import os
 from celery import Celery
+from celery.schedules import crontab
 
 
 def _make_celery_app() -> Celery:
@@ -20,6 +21,26 @@ def _make_celery_app() -> Celery:
     }
     app.conf.task_default_queue = "simulation"
     app.conf.worker_hijack_root_logger = False
+    # Optional periodic schedules (enable if running celery beat)
+    if os.getenv("ENABLE_CELERY_BEAT", "true").lower() in ("1","true","yes"):
+        app.conf.timezone = os.getenv("TZ", "UTC")
+        app.conf.beat_schedule = {
+            # Process one queued item frequently
+            "queue-consumer-once": {
+                "task": "app.tasks.queue_consumer_once",
+                "schedule": 5.0,  # seconds
+            },
+            # Run ongoing scheduler hourly
+            "schedule-ongoing-hourly": {
+                "task": "app.tasks.schedule_ongoing",
+                "schedule": crontab(minute=0),
+            },
+            # Inflate sigma daily at 00:00 UTC
+            "inflate-sigma-daily": {
+                "task": "app.tasks.inflate_sigma_for_inactive",
+                "schedule": crontab(minute=0, hour=0),
+            },
+        }
     return app
 
 
