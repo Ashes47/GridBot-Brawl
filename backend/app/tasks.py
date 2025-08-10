@@ -618,6 +618,9 @@ def schedule_ongoing() -> dict:
     max_daily_quad = _env_int("MAX_DAILY_QUAD", daily_quad_base + max_daily_extra)
     band_duo = _env_float("BAND_WIDTH_DUO", 3.0)
     band_quad = _env_float("BAND_WIDTH_QUAD", 3.5)
+    # Optional: remove daily caps and keep scheduling while sigma > target
+    unbounded = _env_bool("UNBOUNDED_UNTIL_SIGMA", False)
+    unbounded_per_run = _env_int("UNBOUNDED_PER_RUN", 20)  # safety per run
     with SessionLocal() as session:
         ratings_duo = _ratings_for_mode(session, "duo")
         ratings_quad = _ratings_for_mode(session, "quad")
@@ -679,9 +682,21 @@ def schedule_ongoing() -> dict:
             daily_duo = dynamic_daily("duo", t)
             need = max(0, daily_duo - have)
             if need == 0:
-                continue
+                # When unbounded, still push more if sigma above target
+                if not unbounded:
+                    continue
             mu_map = ratings_duo
             if t not in mu_map:
+                continue
+            if unbounded:
+                # If uncertainty above target, schedule at least N this run
+                current_sigma = float(mu_map.get(t, (25.0, 0.0))[1])
+                if current_sigma > sigma_target:
+                    need = max(need, unbounded_per_run)
+                else:
+                    # No need to schedule for this team if target reached
+                    need = 0
+            if need == 0:
                 continue
             # 70/20/10 split
             near = _choose_nearby_opponents(mu_map, t, band_duo, {t})
@@ -714,9 +729,18 @@ def schedule_ongoing() -> dict:
                 daily_quad = dynamic_daily("quad", t)
                 need = max(0, daily_quad - have)
                 if need == 0:
-                    continue
+                    if not unbounded:
+                        continue
                 mu_map = ratings_quad
                 if t not in mu_map:
+                    continue
+                if unbounded:
+                    current_sigma = float(mu_map.get(t, (25.0, 0.0))[1])
+                    if current_sigma > sigma_target:
+                        need = max(need, unbounded_per_run)
+                    else:
+                        need = 0
+                if need == 0:
                     continue
                 higher, lower = _choose_higher_lower(mu_map, t, band_quad, 2.0, {t})
                 near = _choose_nearby_opponents(mu_map, t, band_quad, {t})
