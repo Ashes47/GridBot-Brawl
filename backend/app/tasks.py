@@ -627,12 +627,32 @@ def schedule_ongoing() -> dict:
         now = datetime.utcnow()
         start = datetime(now.year, now.month, now.day)
         def count_active(mode: str, tid: str) -> int:
+            """Count today's pending/running matches for team tid in given mode,
+            excluding any matches that include baseline teams. This ensures
+            baseline scrims do not eat into DAILY_* quotas from .env.
+            """
             key_like = f"%{tid}%"
-            return (
+            rows = (
                 session.query(Match)
-                .filter(Match.mode == mode, Match.created_at >= start, Match.status.in_(["pending","running"]), Match.team_ids.like(key_like))
-                .count()
+                .filter(
+                    Match.mode == mode,
+                    Match.created_at >= start,
+                    Match.status.in_(["pending", "running"]),
+                    Match.team_ids.like(key_like),
+                )
+                .all()
             )
+            cnt = 0
+            for m in rows:
+                try:
+                    ids = [x.strip() for x in (m.team_ids or "").split(",") if x.strip()]
+                except Exception:
+                    ids = []
+                # Exclude if ANY baseline present in the match
+                if any(x in baselines for x in ids):
+                    continue
+                cnt += 1
+            return cnt
 
         def dynamic_daily(mode: str, tid: str) -> int:
             mu_map = ratings_duo if mode == "duo" else ratings_quad
