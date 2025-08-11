@@ -17,6 +17,8 @@ from ..tasks import (
     queue_consumer_once,
     schedule_calibration_for_team,
     inflate_sigma_for_inactive,
+    reset_and_reenqueue_all,
+    reset_and_reenqueue_team,
 )
 
 
@@ -61,6 +63,21 @@ async def run_queue_consumer_once(x_admin_token: str | None = Header(None)):
 async def run_calibration_for_team(team_id: str, x_admin_token: str | None = Header(None)):
     require_admin(x_admin_token)
     out = schedule_calibration_for_team.apply_async(args=[team_id], queue="simulation")
+    return {"status": "queued", "task_id": out.id}
+
+
+@router.post("/scheduler/reset_team/{team_id}")
+async def reset_team(team_id: str, x_admin_token: str | None = Header(None)):
+    require_admin(x_admin_token)
+    out = reset_and_reenqueue_team.apply_async(args=[team_id], queue="simulation")
+    return {"status": "queued", "task_id": out.id}
+
+
+@router.post("/leaderboard/re-evaluate")
+async def leaderboard_re_evaluate_admin(x_admin_token: str | None = Header(None)):
+    """Reset all matches/queue/ratings and re-enqueue calibration for all teams (admin). Also cleans data/matches."""
+    require_admin(x_admin_token)
+    out = reset_and_reenqueue_all.apply_async(queue="simulation")
     return {"status": "queued", "task_id": out.id}
 
 

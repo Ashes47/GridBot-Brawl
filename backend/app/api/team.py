@@ -14,6 +14,7 @@ from passlib.hash import bcrypt
 
 from ..database import get_session
 from ..db_models import Member, Team
+from ..db_models import Match, MatchQueue, Rating, RatingEvent
 from ..tasks import schedule_calibration_for_team
 import os
 from redis import asyncio as aioredis
@@ -329,14 +330,42 @@ async def delete_team(
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    # Delete from DB
+    # Collect match logs for cleanup and delete DB rows related to this team
+    # 1) Collect matches (ids and log paths)
+    rows = await session.execute(select(Match.id, Match.log_path).where(Match.team_ids.like(f"%{team_id}%")))
+    match_rows = rows.all()
+    # 2) Delete queue entries involving this team
+    await session.execute(MatchQueue.__table__.delete().where(MatchQueue.team_ids.contains([tid])))
+    # 3) Delete matches
+    await session.execute(Match.__table__.delete().where(Match.team_ids.like(f"%{team_id}%")))
+    # 4) Delete rating events and ratings for this team
+    await session.execute(RatingEvent.__table__.delete().where(RatingEvent.team_id == tid))
+    await session.execute(Rating.__table__.delete().where(Rating.team_id == tid))
+    # 5) Delete the team row
     await session.delete(team)
     await session.flush()
 
-    # Delete code from disk
+    # Delete team code directory from disk
     team_dir = DATA_DIR / str(team_id)
     if team_dir.exists():
         shutil.rmtree(team_dir)
+    # Delete match logs from data/matches
+    try:
+        from pathlib import Path as _Path
+        base = _Path(os.getenv("DATA_DIR", "./data/matches"))
+        for mid, log_path in match_rows:
+            try:
+                p = _Path(log_path or "")
+                if p.is_absolute() and p.exists():
+                    p.unlink(missing_ok=True)
+                else:
+                    cand = base / (p.name if p.name else str(p))
+                    if cand.exists():
+                        cand.unlink(missing_ok=True)
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     return
 

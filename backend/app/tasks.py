@@ -19,6 +19,8 @@ import asyncio
 from .simulation import simulate_match
 from itertools import combinations
 from datetime import timedelta
+from pathlib import Path
+import shutil
 import math
 
 # Create async engine/sessionmaker per worker thread to avoid cross-event-loop locks
@@ -855,6 +857,15 @@ def reset_and_reenqueue_all() -> dict:
         # Reset calibration progress
         session.execute(update(Team).values(calibration_progress_duo=0, calibration_progress_quad=0))
         session.commit()
+        # Remove all match logs from disk (data/matches)
+        try:
+            matches_dir = Path(os.getenv("DATA_DIR", "./data/matches"))
+            if matches_dir.exists() and matches_dir.is_dir():
+                shutil.rmtree(matches_dir)
+            matches_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            # non-fatal
+            pass
         # Enqueue calibration for all non-baseline teams
         rows = session.execute(select(Team.id, Team.name)).all()
         for tid, name in rows:
@@ -862,4 +873,64 @@ def reset_and_reenqueue_all() -> dict:
                 continue
             schedule_calibration_for_team.apply_async(args=[str(tid)], queue="simulation")
             cleared["teams_enqueued"] += 1
+    return cleared
+
+
+def _delete_match_logs_for_ids(match_ids: List[str]) -> None:
+    """Best-effort removal of log files for provided matches."""
+    with SessionLocal() as session:
+        rows = session.execute(select(Match.id, Match.log_path).where(Match.id.in_([uuid.UUID(mid) for mid in match_ids]))).all()
+        for mid, log_path in rows:
+            try:
+                p = Path(log_path or "")
+                if p.is_absolute() and p.exists():
+                    p.unlink(missing_ok=True)
+                else:
+                    base = Path(os.getenv("DATA_DIR", "./data/matches"))
+                    cand = base / (p.name if p.name else str(p))
+                    if cand.exists():
+                        cand.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+
+@celery_app.task(name="app.tasks.reset_and_reenqueue_team")
+def reset_and_reenqueue_team(team_id: str) -> dict:
+    """Dangerous: clears matches/queue/ratings for one team, deletes its match logs,
+    resets calibration progress, and re-enqueues calibration for that team.
+    """
+    from sqlalchemy import delete
+    cleared = {"matches": 0, "queue": 0, "ratings": 0, "events": 0}
+    try:
+        tid = uuid.UUID(team_id)
+    except ValueError:
+        return cleared
+    match_ids: List[str] = []
+    with SessionLocal() as session:
+        # collect matches involving this team
+        rows = (
+            session.query(Match.id)
+            .filter(Match.team_ids.like(f"%{team_id}%"))
+            .all()
+        )
+        match_ids = [str(r[0]) for r in rows]
+        cleared["matches"] = len(match_ids)
+        # delete queue entries involving team
+        session.execute(delete(MatchQueue).where(MatchQueue.team_ids.contains([tid])))
+        # delete matches
+        session.execute(delete(Match).where(Match.team_ids.like(f"%{team_id}%")))
+        # delete rating events & ratings for this team
+        session.execute(delete(RatingEvent).where(RatingEvent.team_id == tid))
+        session.execute(delete(Rating).where(Rating.team_id == tid))
+        # reset calibration progress for this team
+        session.execute(update(Team).where(Team.id == tid).values(calibration_progress_duo=0, calibration_progress_quad=0))
+        session.commit()
+    # remove logs from disk
+    try:
+        if match_ids:
+            _delete_match_logs_for_ids(match_ids)
+    except Exception:
+        pass
+    # re-enqueue calibration
+    schedule_calibration_for_team.apply_async(args=[team_id], queue="simulation")
     return cleared

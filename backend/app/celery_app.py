@@ -28,7 +28,7 @@ def _make_celery_app() -> Celery:
             # Process one queued item frequently
             "queue-consumer-once": {
                 "task": "app.tasks.queue_consumer_once",
-                "schedule": 5.0,  # seconds
+                "schedule": 1.0,  # seconds
             },
             # Run ongoing scheduler hourly
             "schedule-ongoing-hourly": {

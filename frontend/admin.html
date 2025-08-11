@@ -87,13 +87,15 @@
           <h3>Scheduler</h3>
           <p class="desc">- <strong>Run Ongoing Scheduler</strong>: Schedules matches for teams per current policy.<br>
             - <strong>Consume One Queue Cycle</strong>: Run one pass of the queue consumer to pop/advance jobs.<br>
-            - <strong>Calibrate Selected Team</strong>: Enqueue matchup calibration for the selected team.</p>
+            - <strong>Calibrate Selected Team</strong>: Enqueue matchup calibration for the selected team.<br>
+            - <strong>Reset Selected Team</strong>: Clear its matches/ratings, delete logs, and recalibrate.</p>
           <div class="row" style="margin-top:8px;">
             <button id="btn-ongoing">Run Ongoing Scheduler</button>
             <button id="btn-consume">Consume One Queue Cycle</button>
           </div>
           <div class="row" style="margin-top:8px;">
             <button id="btn-calibrate">Calibrate Selected Team</button>
+            <button id="btn-reset-team" class="danger">Reset Selected Team</button>
           </div>
           <div class="muted" id="sched-status"></div>
         </div>
@@ -139,6 +141,7 @@
         schedOngoing: 'http://localhost:8000/admin/scheduler/ongoing',
         schedConsume: 'http://localhost:8000/admin/scheduler/consume_once',
         schedCalibrate: (teamId)=>`http://localhost:8000/admin/scheduler/calibrate/${teamId}`,
+        schedResetTeam: (teamId)=>`http://localhost:8000/admin/scheduler/reset_team/${teamId}`,
         ratingsRecompute: 'http://localhost:8000/admin/ratings/recompute',
         ratingsInflate: 'http://localhost:8000/admin/ratings/inflate_sigma',
         leaderboardRebuild: 'http://localhost:8000/admin/leaderboard/rebuild',
@@ -230,6 +233,11 @@
         els('btn-calibrate').onclick = async ()=>{ 
           if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
           try { setStatus('sched-status','Queuing calibration…'); await doPost(api.schedCalibrate(SELECTED_TEAM_ID)); setStatus('sched-status','Queued'); } catch(e){ setStatus('sched-status','Failed'); alert(e.message); }
+        };
+        els('btn-reset-team').onclick = async ()=>{
+          if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
+          if(!confirm('This will delete the team\'s matches, logs, and ratings, then recalibrate. Continue?')) return;
+          try { setStatus('sched-status','Queuing team reset…'); await doPost(api.schedResetTeam(SELECTED_TEAM_ID)); setStatus('sched-status','Queued'); } catch(e){ setStatus('sched-status','Failed'); alert(e.message); }
         };
 
         // Ratings & baselines
