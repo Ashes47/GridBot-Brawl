@@ -1303,7 +1303,37 @@
       const botSel = document.getElementById('inspect-bot');
       const bid = (botSel && botSel.value) || selectedBotId;
       const frame = frames[tick];
-      const obs = frame?.observations?.[bid];
+      let obs = frame?.observations?.[bid];
+      // Merge observations across the selected bot's team (shared vision by default)
+      if (frame && frame.observations && bid){
+        const prefix = bid.split('-')[0];
+        const all = frame.observations;
+        const mergeList = (getter) => {
+          const set = new Set();
+          const out = [];
+          Object.entries(all).forEach(([oid, o])=>{
+            if (!oid.startsWith(prefix+"-")) return;
+            const arr = getter(o) || [];
+            arr.forEach((item)=>{
+              const key = Array.isArray(item) ? JSON.stringify(item) : JSON.stringify([item.x, item.y, item.team || item.component || item.id || '']);
+              if (!set.has(key)){ set.add(key); out.push(item); }
+            });
+          });
+          return out;
+        };
+        if (obs){
+          // clone obs to avoid mutating source
+          obs = JSON.parse(JSON.stringify(obs));
+          obs.visible_enemies = mergeList(o=>o.visible_enemies);
+          obs.visible_allies = mergeList(o=>o.visible_allies);
+          obs.visible_walls = mergeList(o=>o.visible_walls);
+          obs.visible_static_walls = mergeList(o=>o.visible_static_walls);
+          obs.visible_decoys = mergeList(o=>o.visible_decoys);
+          obs.visible_traps = mergeList(o=>o.visible_traps);
+          obs.visible_terrain = mergeList(o=>o.visible_terrain);
+          obs.visible_zones = mergeList(o=>o.visible_zones);
+        }
+      }
       const pre = document.getElementById('inspect-output');
       if (pre) pre.textContent = obs ? JSON.stringify(obs, null, 2) : 'No observation available';
       if (!obs && MAP_SPEC && pre){
@@ -1330,6 +1360,7 @@
         render();
       };
     }
+    // shared vision is default; no toggle
     // end panel close
     document.getElementById('close-end').onclick = ()=>{ document.getElementById('end-panel').style.display='none'; };
 
