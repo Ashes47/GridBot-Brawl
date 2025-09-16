@@ -348,15 +348,15 @@
     }
 
     async function fetchTeam() {
-      const r = await fetch(`http://localhost:8000/teams/${teamId}`);
+      const r = await fetch(`https://api.gridbotbrawl.com/teams/${teamId}`);
       return await r.json();
     }
     async function fetchMatches() {
-      const r = await fetch(`http://localhost:8000/teams/${teamId}/matches`);
+      const r = await fetch(`https://api.gridbotbrawl.com/teams/${teamId}/matches`);
       return await r.json();
     }
     async function fetchComponents(){
-      const r = await fetch('http://localhost:8000/metadata/components');
+      const r = await fetch('https://api.gridbotbrawl.com/metadata/components');
       return (await r.json()).components || [];
     }
     function shorten(id) { return id.slice(0,6)+'…'; }
@@ -435,7 +435,7 @@
       
       // Queue status for this team (count of pending+running today)
       try {
-        const pr = await fetch(`http://localhost:8000/teams/${teamId}/queue_status`).then(r=>r.json());
+        const pr = await fetch(`https://api.gridbotbrawl.com/teams/${teamId}/queue_status`).then(r=>r.json());
         document.getElementById('queue-status').textContent = `${pr.queued || 0} queued • ${pr.pending || 0} pending • ${pr.running || 0} running`;
       } catch (e) {
         document.getElementById('queue-status').textContent = '';
@@ -449,7 +449,7 @@
           const rosterOverride = Array.from(baseSelected);
           const body = { team_id: teamId };
           if (rosterOverride.length === 5) body.baseline_roster = rosterOverride;
-          const res = await fetch(`http://localhost:8000/simulate/vs_baseline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+          const res = await fetch(`https://api.gridbotbrawl.com/simulate/vs_baseline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
           if (!res.ok) {
             statusEl.textContent = 'Failed to queue match';
             alert('Failed: ' + (await res.text()));
@@ -472,7 +472,7 @@
         statusEl.textContent = 'Uploading…';
         const formData = new FormData(uploadForm);
         try {
-          const res = await fetch(`http://localhost:8000/teams/${teamId}`, { method: 'PUT', body: formData });
+          const res = await fetch(`https://api.gridbotbrawl.com/teams/${teamId}`, { method: 'PUT', body: formData });
           const txt = await res.text();
           if (!res.ok) throw new Error(txt);
           statusEl.textContent = 'Updated';
@@ -492,7 +492,7 @@
         form.append('password', pwd);
         form.append('roster', JSON.stringify(Array.from(selected)));
         statusEl.textContent = 'Saving…';
-        const res = await fetch(`http://localhost:8000/teams/${teamId}`, { method: 'PUT', body: form });
+        const res = await fetch(`https://api.gridbotbrawl.com/teams/${teamId}`, { method: 'PUT', body: form });
         if (res.ok){ statusEl.textContent = 'Saved'; } else { statusEl.textContent = 'Failed'; alert(await res.text()); }
       };
 
@@ -505,7 +505,7 @@
         try {
           const form = new FormData();
           form.append('password', password);
-          const res = await fetch(`http://localhost:8000/teams/${teamId}/submit_for_evaluation`, { method: 'POST', body: form });
+          const res = await fetch(`https://api.gridbotbrawl.com/teams/${teamId}/submit_for_evaluation`, { method: 'POST', body: form });
           if (!res.ok) { el.textContent = 'Failed'; alert('Failed: ' + (await res.text())); return; }
           el.textContent = 'Queued evaluation';
         } catch (e) {

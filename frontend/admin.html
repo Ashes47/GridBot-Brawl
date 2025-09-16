@@ -157,21 +157,21 @@
 
     <script>
       const api = {
-        lbRecompute: 'http://localhost:8000/leaderboard/re-compute',
-        lbReeval: 'http://localhost:8000/leaderboard/re-evaluate',
-        schedOngoing: 'http://localhost:8000/admin/scheduler/ongoing',
-        schedConsume: 'http://localhost:8000/admin/scheduler/consume_once',
-        schedCalibrate: (teamId)=>`http://localhost:8000/admin/scheduler/calibrate/${teamId}`,
-        schedResetTeam: (teamId)=>`http://localhost:8000/admin/scheduler/reset_team/${teamId}`,
-        ratingsRecompute: 'http://localhost:8000/admin/ratings/recompute',
-        ratingsInflate: 'http://localhost:8000/admin/ratings/inflate_sigma',
-        leaderboardRebuild: 'http://localhost:8000/admin/leaderboard/rebuild',
-        baselinesSeed: 'http://localhost:8000/admin/baselines/seed',
-        settingsSignup: 'http://localhost:8000/admin/settings/signup',
-        bulkSignup: 'http://localhost:8000/admin/bulk_signup',
-        teamListAll: `http://localhost:8000/teams?limit=10000`,
-        teamResetPassword: (id)=>`http://localhost:8000/teams/${id}/reset_password`,
-        teamDelete: (id)=>`http://localhost:8000/teams/${id}`,
+        lbRecompute: 'https://api.gridbotbrawl.com/leaderboard/re-compute',
+        lbReeval: 'https://api.gridbotbrawl.com/leaderboard/re-evaluate',
+        schedOngoing: 'https://api.gridbotbrawl.com/admin/scheduler/ongoing',
+        schedConsume: 'https://api.gridbotbrawl.com/admin/scheduler/consume_once',
+        schedCalibrate: (teamId)=>`https://api.gridbotbrawl.com/admin/scheduler/calibrate/${teamId}`,
+        schedResetTeam: (teamId)=>`https://api.gridbotbrawl.com/admin/scheduler/reset_team/${teamId}`,
+        ratingsRecompute: 'https://api.gridbotbrawl.com/admin/ratings/recompute',
+        ratingsInflate: 'https://api.gridbotbrawl.com/admin/ratings/inflate_sigma',
+        leaderboardRebuild: 'https://api.gridbotbrawl.com/admin/leaderboard/rebuild',
+        baselinesSeed: 'https://api.gridbotbrawl.com/admin/baselines/seed',
+        settingsSignup: 'https://api.gridbotbrawl.com/admin/settings/signup',
+        bulkSignup: 'https://api.gridbotbrawl.com/admin/bulk_signup',
+        teamListAll: `https://api.gridbotbrawl.com/teams?limit=10000`,
+        teamResetPassword: (id)=>`https://api.gridbotbrawl.com/teams/${id}/reset_password`,
+        teamDelete: (id)=>`https://api.gridbotbrawl.com/teams/${id}`,
       };
 
       const els = (id)=>document.getElementById(id);
