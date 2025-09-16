@@ -84,6 +84,27 @@
         </div>
 
         <div class="card">
+          <h3>Signup Settings</h3>
+          <p class="desc">Enable or disable public team signup. You can also bulk create teams from a CSV.</p>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-signup-enable">Enable Signup</button>
+            <button id="btn-signup-disable" class="danger">Disable Signup</button>
+            <span class="muted" id="signup-status"></span>
+          </div>
+          <div class="row" style="margin-top:12px; align-items:flex-start; gap:12px;">
+            <div>
+              <input type="file" id="csv-file" accept=".csv">
+              <button id="btn-bulk-upload">Bulk Signup (Upload CSV)</button>
+            </div>
+            <div>
+              <input id="csv-path" type="text" placeholder="/absolute/path/to/registration.csv" style="min-width:340px;">
+              <button id="btn-bulk-path">Bulk Signup (Server Path)</button>
+            </div>
+          </div>
+          <div class="muted" id="bulk-status"></div>
+        </div>
+
+        <div class="card">
           <h3>Scheduler</h3>
           <p class="desc">- <strong>Run Ongoing Scheduler</strong>: Schedules matches for teams per current policy.<br>
             - <strong>Consume One Queue Cycle</strong>: Run one pass of the queue consumer to pop/advance jobs.<br>
@@ -146,6 +167,8 @@
         ratingsInflate: 'http://localhost:8000/admin/ratings/inflate_sigma',
         leaderboardRebuild: 'http://localhost:8000/admin/leaderboard/rebuild',
         baselinesSeed: 'http://localhost:8000/admin/baselines/seed',
+        settingsSignup: 'http://localhost:8000/admin/settings/signup',
+        bulkSignup: 'http://localhost:8000/admin/bulk_signup',
         teamListAll: `http://localhost:8000/teams?limit=10000`,
         teamResetPassword: (id)=>`http://localhost:8000/teams/${id}/reset_password`,
         teamDelete: (id)=>`http://localhost:8000/teams/${id}`,
@@ -162,6 +185,7 @@
         els('admin-pass').value = ADMIN_PASS;
       }
       function headers(){ return ADMIN_TOKEN ? { 'X-Admin-Token': ADMIN_TOKEN } : {}; }
+      function headersForm(){ return ADMIN_TOKEN ? { 'X-Admin-Token': ADMIN_TOKEN } : {}; }
       function setStatus(id, text){ els(id).textContent = text; }
 
       async function doPost(url, hdrs){
@@ -274,6 +298,39 @@
             if(!r.ok) throw new Error(await r.text());
             setStatus('team-status','Deleted');
           } catch(e){ setStatus('team-status','Failed'); alert(e.message); }
+        };
+        // Signup settings
+        els('btn-signup-enable').onclick = async ()=>{
+          try { setStatus('signup-status','Saving…');
+            const form = new FormData(); form.append('enabled','true');
+            const r = await fetch(api.settingsSignup, { method:'POST', headers: headersForm(), body: form });
+            if(!r.ok) throw new Error(await r.text()); setStatus('signup-status','Enabled');
+          } catch(e){ setStatus('signup-status','Failed'); alert(e.message); }
+        };
+        els('btn-signup-disable').onclick = async ()=>{
+          try { setStatus('signup-status','Saving…');
+            const form = new FormData(); form.append('enabled','false');
+            const r = await fetch(api.settingsSignup, { method:'POST', headers: headersForm(), body: form });
+            if(!r.ok) throw new Error(await r.text()); setStatus('signup-status','Disabled');
+          } catch(e){ setStatus('signup-status','Failed'); alert(e.message); }
+        };
+        els('btn-bulk-upload').onclick = async ()=>{
+          try { setStatus('bulk-status','Uploading…');
+            const f = els('csv-file').files[0]; if(!f){ alert('Choose a CSV file'); return; }
+            const form = new FormData(); form.append('csv_file', f);
+            const r = await fetch(api.bulkSignup, { method:'POST', headers: headersForm(), body: form });
+            if(!r.ok) throw new Error(await r.text()); const data = await r.json();
+            setStatus('bulk-status', `Created ${data.created}, skipped ${data.skipped}`);
+          } catch(e){ setStatus('bulk-status','Failed'); alert(e.message); }
+        };
+        els('btn-bulk-path').onclick = async ()=>{
+          try { setStatus('bulk-status','Submitting…');
+            const path = els('csv-path').value.trim(); if(!path){ alert('Enter CSV path'); return; }
+            const form = new FormData(); form.append('csv_path', path);
+            const r = await fetch(api.bulkSignup, { method:'POST', headers: headersForm(), body: form });
+            if(!r.ok) throw new Error(await r.text()); const data = await r.json();
+            setStatus('bulk-status', `Created ${data.created}, skipped ${data.skipped}`);
+          } catch(e){ setStatus('bulk-status','Failed'); alert(e.message); }
         };
       });
     </script>

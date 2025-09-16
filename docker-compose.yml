@@ -1,6 +1,31 @@
 version: "3.9"
 
 services:
+  traefik:
+    image: traefik:v2.10
+    restart: always
+    env_file:
+      - .env
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge=true
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - botnet
   db:
     image: postgres:15-alpine
     env_file:
@@ -37,6 +62,13 @@ services:
       - ./maps:/app/maps
     networks:
       - botnet
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.backend.rule=Host(`${BACKEND_DOMAIN}`)
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.routers.backend.tls=true
+      - traefik.http.routers.backend.tls.certresolver=le
+      - traefik.http.services.backend.loadbalancer.server.port=8000
 
   worker-baseline:
     build:
@@ -100,10 +132,19 @@ services:
       - redis
     networks:
       - botnet
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.flower.rule=Host(`${FLOWER_DOMAIN}`)
+      - traefik.http.routers.flower.entrypoints=websecure
+      - traefik.http.routers.flower.tls=true
+      - traefik.http.routers.flower.tls.certresolver=le
+      - traefik.http.services.flower.loadbalancer.server.port=5555
 
   frontend:
     build:
       context: ./frontend
+    env_file:
+      - .env
     ports:
       - "8080:80"
     volumes:
@@ -112,6 +153,15 @@ services:
       - backend
     networks:
       - botnet
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`${FRONTEND_DOMAIN}`)
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.routers.frontend.tls=true
+      - traefik.http.routers.frontend.tls.certresolver=le
+      - traefik.http.services.frontend.loadbalancer.server.port=80
+    environment:
+      - API_BASE=http://${BACKEND_DOMAIN}
 
 networks:
   botnet:
@@ -119,3 +169,4 @@ networks:
 
 volumes:
   db_data: 
+  traefik_letsencrypt:
