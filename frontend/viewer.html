@@ -1155,7 +1155,7 @@ ush<html lang="en" data-version="1758052005">
     let META_BY_CODE = {};
     async function loadComponentMeta(){
       try{
-        const res = await fetch('https://api.gridbotbrawl.com/metadata/components');
+        const res = await fetch('http://localhost:8000/metadata/components');
         const data = await res.json();
         const comps = data.components || [];
         META_BY_CODE = Object.fromEntries(comps.map(c=>[c.code, c]));
@@ -2429,7 +2429,7 @@ ush<html lang="en" data-version="1758052005">
 
     (async function init() {
       try {
-        const metaRes = await fetch(`https://api.gridbotbrawl.com/matches/${matchId}`);
+        const metaRes = await fetch(`http://localhost:8000/matches/${matchId}`);
         const meta = await metaRes.json();
         metaInfo = meta;
         if (meta.status !== 'finished') {
@@ -2446,7 +2446,7 @@ ush<html lang="en" data-version="1758052005">
         });
         tv.onchange = ()=>{ selectedTeamPrefix = tv.value; render(); };
 
-        await fetchLog(`https://api.gridbotbrawl.com/matches/${matchId}/log`);
+        await fetchLog(`http://localhost:8000/matches/${matchId}/log`);
         // consume summary tail for damage map
         if (frames[frames.length-1]?.summary){ summaryDamageByBot = frames[frames.length-1].damage_by_bot || {}; frames.pop(); }
         // set slider max after removing summary

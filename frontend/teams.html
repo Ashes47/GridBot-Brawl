@@ -189,7 +189,7 @@
   <script>
     async function load(query='') {
       try {
-        const res = await fetch(`https://api.gridbotbrawl.com/teams?limit=1000&search=${encodeURIComponent(query)}`);
+        const res = await fetch(`http://localhost:8000/teams/?limit=1000&search=${encodeURIComponent(query)}`);
         const rows = await res.json();
         const tbody = document.getElementById('tbody');
         tbody.innerHTML='';

@@ -231,7 +231,7 @@
 
   <script src="cache-bust.js"></script><script>
     async function loadBots(){
-      const res = await fetch('https://api.gridbotbrawl.com/metadata/components');
+      const res = await fetch('http://localhost:8000/metadata/components');
       const comps = (await res.json()).components || [];
       const container = document.getElementById('bots');
       

@@ -192,7 +192,7 @@
   
   <div class="container">
     <h1>Team Signup</h1>
-    <form id="signup-form" action="https://api.gridbotbrawl.com/teams" method="post" enctype="multipart/form-data">
+    <form id="signup-form" action="http://localhost:8000/teams" method="post" enctype="multipart/form-data">
     <label>Team Name
       <input type="text" name="name" required>
     </label>
@@ -247,7 +247,7 @@
     }
 
     async function loadComponents(){
-      const res = await fetch('https://api.gridbotbrawl.com/metadata/components');
+      const res = await fetch('http://localhost:8000/metadata/components');
       const data = await res.json();
       components = data.components || [];
       renderCards();
@@ -257,7 +257,7 @@
     // Fetch public config to check if signup is enabled (wrapped to avoid top-level await)
     (async ()=>{
       try {
-        const r = await fetch('https://api.gridbotbrawl.com/metadata/config');
+        const r = await fetch('http://localhost:8000/metadata/config');
         const cfg = await r.json();
         if(cfg && cfg.signup_enabled === false){
           form.querySelectorAll('input,button').forEach(el=>{ el.disabled = true; });

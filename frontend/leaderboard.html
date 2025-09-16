@@ -233,7 +233,7 @@
       // Update active mode styling
       document.getElementById('duo-link').classList.toggle('active', mode === 'duo');
       document.getElementById('quad-link').classList.toggle('active', mode === 'quad');
-      const res = await fetch(`https://api.gridbotbrawl.com/leaderboard?mode=${mode}`);
+      const res = await fetch(`http://localhost:8000/leaderboard?mode=${mode}`);
       const data = await res.json();
       const tbody = document.getElementById('tbody');
       tbody.innerHTML='';
@@ -255,7 +255,7 @@
       });
       // update status: pending/running counts
       const statusDiv = document.getElementById('status');
-      const pr = await fetch(`https://api.gridbotbrawl.com/leaderboard/pending_running?mode=${mode}`).then(r=>r.json()).catch(()=>({pending:0,running:0,queued:0}));
+      const pr = await fetch(`http://localhost:8000/leaderboard/pending_running?mode=${mode}`).then(r=>r.json()).catch(()=>({pending:0,running:0,queued:0}));
       statusDiv.textContent = `${(data.teams || []).length} teams • ${pr.queued} queued • ${pr.pending} pending • ${pr.running} running`;
       
       // Update page title
