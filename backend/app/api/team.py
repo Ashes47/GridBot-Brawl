@@ -13,7 +13,7 @@ import shutil
 from passlib.hash import bcrypt
 
 from ..database import get_session
-from ..db_models import Member, Team
+from ..db_models import Member, Team, AppSetting
 from ..db_models import Match, MatchQueue, Rating, RatingEvent
 from ..tasks import schedule_calibration_for_team
 import os
@@ -128,6 +128,15 @@ async def create_team(
     session: AsyncSession = Depends(get_session),
 ):
     """Register a team. If no roster provided but a bot file is uploaded, auto-detect the first 5 valid component classes found in the file."""
+    # Check if signup is enabled (default True if setting absent)
+    res = await session.execute(select(AppSetting).where(AppSetting.key == "signup_enabled"))
+    row = res.scalar_one_or_none()
+    enabled = True
+    if row is not None:
+        val = (row.value or "").strip().lower()
+        enabled = val in ("1", "true", "yes", "on")
+    if not enabled:
+        raise HTTPException(status_code=403, detail="Signup is currently disabled by admin")
     # ensure unique name
     existing = await session.execute(select(Team).where(Team.name == name))
     if existing.scalar_one_or_none():

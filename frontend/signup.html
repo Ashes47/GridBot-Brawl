@@ -252,6 +252,18 @@
     }
     loadComponents();
 
+    // Fetch public config to check if signup is enabled (wrapped to avoid top-level await)
+    (async ()=>{
+      try {
+        const r = await fetch('http://localhost:8000/metadata/config');
+        const cfg = await r.json();
+        if(cfg && cfg.signup_enabled === false){
+          form.querySelectorAll('input,button').forEach(el=>{ el.disabled = true; });
+          resultEl.textContent = 'Signup is currently disabled by the admin.';
+        }
+      } catch(e){ /* ignore */ }
+    })();
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const hasFile = botInput && botInput.files && botInput.files.length > 0;
@@ -260,10 +272,34 @@
       const formData = new FormData(form);
       try {
         const res = await fetch(form.action, { method: 'POST', body: formData });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Error');
+        if (!res.ok) {
+          const txt = await res.text().catch(()=> 'Error');
+          try { const j = JSON.parse(txt); throw new Error(j.detail || txt || 'Error'); } catch { throw new Error(txt || 'Error'); }
+        }
+        let id = null;
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          try {
+            const data = await res.json();
+            id = data && data.id;
+          } catch (_) { /* ignore */ }
+        }
+        if (!id) {
+          // Fallback: look up team by name
+          const teamName = (formData.get('name') || '').toString();
+          try {
+            const base = new URL(form.action).origin;
+            const r = await fetch(`${base}/teams?search=${encodeURIComponent(teamName)}&limit=5`);
+            if (r.ok) {
+              const list = await r.json();
+              const match = (Array.isArray(list) ? list : []).find(t => (t.name || '').toLowerCase() === teamName.toLowerCase());
+              if (match && match.id) id = match.id;
+            }
+          } catch(_) { /* ignore */ }
+        }
+        if (!id) { id = ''; }
         resultEl.innerHTML = `<strong>Success!</strong> Redirecting to team page…`;
-        window.location.href = `team.html?id=${data.id}`;
+        window.location.href = `team.html?id=${id}`;
       } catch (err) {
         resultEl.textContent = 'Error: ' + err.message;
       }

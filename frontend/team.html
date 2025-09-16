@@ -269,6 +269,7 @@
   
   <div class="container">
     <h1 id="team-name">Team</h1>
+    <div id="member-list" style="color:#94a3b8; margin-top:-8px; margin-bottom:16px;"></div>
     
     <div class="components-section">
       <h3 style="margin-top: 0;">Current Roster</h3>
@@ -363,6 +364,12 @@
     (async function init() {
       const [team, compsMeta] = await Promise.all([fetchTeam(), fetchComponents()]);
       document.getElementById('team-name').textContent = team.name;
+      const ml = document.getElementById('member-list');
+      if (Array.isArray(team.members) && team.members.length){
+        ml.textContent = 'Members: ' + team.members.join(', ');
+      } else {
+        ml.textContent = '';
+      }
 
       const matches = await fetchMatches();
 

@@ -18,7 +18,7 @@ app = FastAPI(title="GridBot Brawl API")
 # Allow frontend (localhost:8080) to call APIs during dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

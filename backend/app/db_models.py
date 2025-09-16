@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Integer, Float
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text, Integer, Float, Boolean
 from sqlalchemy.dialects.postgresql import UUID, ENUM, ARRAY, JSONB
 from sqlalchemy.orm import relationship
 
@@ -31,6 +31,14 @@ class Member(Base):
     team_id = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="CASCADE"))
 
     team = relationship("Team", back_populates="members")
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key = Column(String(50), primary_key=True)
+    # Store values as strings for flexibility; cast at read sites
+    value = Column(String(200), nullable=False)
 
 
 class Match(Base):

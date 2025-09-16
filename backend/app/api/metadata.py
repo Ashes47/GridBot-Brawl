@@ -1,4 +1,9 @@
-from fastapi import APIRouter
+import os
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from ..database import get_session
+from ..db_models import AppSetting
 
 router = APIRouter(prefix="/metadata", tags=["metadata"])
 
@@ -67,3 +72,15 @@ def get_map_rules():
         }
     except Exception:
         return {"error": "map rules unavailable"}
+
+
+@router.get("/config")
+async def get_public_config(session: AsyncSession = Depends(get_session)):
+    """Public configuration for frontend: whether signup is enabled."""
+    res = await session.execute(select(AppSetting).where(AppSetting.key == "signup_enabled"))
+    row = res.scalar_one_or_none()
+    enabled = True
+    if row is not None:
+        val = (row.value or "").strip().lower()
+        enabled = val in ("1","true","yes","on")
+    return {"signup_enabled": enabled}
