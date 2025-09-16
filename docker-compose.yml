@@ -161,7 +161,7 @@ services:
       - traefik.http.routers.frontend.tls.certresolver=le
       - traefik.http.services.frontend.loadbalancer.server.port=80
     environment:
-      - API_BASE=http://${BACKEND_DOMAIN}
+      - API_BASE=https://${BACKEND_DOMAIN}
 
 networks:
   botnet:
