@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-version="1758052005">
 <head>
   <meta charset="UTF-8">
   <title>Bots – GridBot Brawl</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="style.css">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0"><meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">  <link rel="stylesheet" href="style.css?v=1758052001">
   <style>
     body { 
       font-family: 'Inter', 'Segoe UI', Arial, sans-serif; 
@@ -227,7 +229,7 @@
 
   <div id="bots" class="grid"></div>
 
-  <script>
+  <script src="cache-bust.js"></script><script>
     async function loadBots(){
       const res = await fetch('https://api.gridbotbrawl.com/metadata/components');
       const comps = (await res.json()).components || [];
