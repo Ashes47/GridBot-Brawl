@@ -366,7 +366,15 @@
       document.getElementById('team-name').textContent = team.name;
       const ml = document.getElementById('member-list');
       if (Array.isArray(team.members) && team.members.length){
-        ml.textContent = 'Members: ' + team.members.join(', ');
+        // Filter out email addresses and only show names
+        const names = team.members.map(member => {
+          // If it looks like an email, extract the name part before @
+          if (member.includes('@')) {
+            return member.split('@')[0];
+          }
+          return member;
+        });
+        ml.textContent = 'Members: ' + names.join(', ');
       } else {
         ml.textContent = '';
       }
