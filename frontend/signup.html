@@ -192,6 +192,17 @@
   
   <div class="container">
     <h1>Team Signup</h1>
+    
+    <!-- Signup Disabled Banner -->
+    <div id="signup-disabled-banner" style="display: none; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 24px; border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">🚫</span>
+        <div>
+          <strong style="font-size: 16px; display: block; margin-bottom: 4px;">Signup Currently Disabled</strong>
+          <span style="font-size: 14px; opacity: 0.9;">New team registrations are temporarily disabled by the administrator. Please check back later or contact support if you have questions.</span>
+        </div>
+      </div>
+    </div>
     <form id="signup-form" action="http://localhost:8000/teams" method="post" enctype="multipart/form-data">
     <label>Team Name
       <input type="text" name="name" required>
@@ -260,8 +271,16 @@
         const r = await fetch('http://localhost:8000/metadata/config');
         const cfg = await r.json();
         if(cfg && cfg.signup_enabled === false){
+          // Show the banner
+          const banner = document.getElementById('signup-disabled-banner');
+          banner.style.display = 'block';
+          
+          // Disable form elements
           form.querySelectorAll('input,button').forEach(el=>{ el.disabled = true; });
-          resultEl.textContent = 'Signup is currently disabled by the admin.';
+          
+          // Hide the form visually
+          form.style.opacity = '0.5';
+          form.style.pointerEvents = 'none';
         }
       } catch(e){ /* ignore */ }
     })();
