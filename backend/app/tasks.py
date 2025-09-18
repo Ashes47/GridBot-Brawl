@@ -52,8 +52,8 @@ def _run_async(coro):
     return loop.run_until_complete(coro)
 
 
-@celery_app.task(name="app.tasks.run_match")
-def run_match(match_id: str, team_ids: List[str], queue_id: str | None = None) -> dict | None:
+@celery_app.task(name="app.tasks.run_match", bind=True)
+def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = None) -> dict | None:
     """Run a match and update DB rows (sync SQLAlchemy session)."""
     with SessionLocal() as session:  # type: Session
         # mark running and assign map seed/name upfront
@@ -146,22 +146,38 @@ def run_match(match_id: str, team_ids: List[str], queue_id: str | None = None) -
                 except Exception:
                     pass
             return None
-        except Exception:
-            session.execute(
-                update(Match).where(Match.id == uuid.UUID(match_id)).values(status="error")
-            )
-            session.commit()
-            if queue_id:
-                try:
-                    session.execute(
-                        update(MatchQueue)
-                        .where(MatchQueue.id == uuid.UUID(queue_id))
-                        .values(status="failed", last_error="Exception during run_match")
-                    )
-                    session.commit()
-                except Exception:
-                    pass
-            raise
+        except Exception as exc:
+            # Check if we should retry this task
+            if self.request.retries < self.max_retries:
+                # Log the retry attempt
+                import logging
+                logging.warning(f"Match {match_id} failed (attempt {self.request.retries + 1}/{self.max_retries + 1}), retrying: {str(exc)}")
+                
+                # Mark as retrying in database
+                session.execute(
+                    update(Match).where(Match.id == uuid.UUID(match_id)).values(status="retrying")
+                )
+                session.commit()
+                
+                # Retry the task
+                raise self.retry(countdown=60, exc=exc)
+            else:
+                # Max retries exceeded, mark as failed
+                session.execute(
+                    update(Match).where(Match.id == uuid.UUID(match_id)).values(status="error")
+                )
+                session.commit()
+                if queue_id:
+                    try:
+                        session.execute(
+                            update(MatchQueue)
+                            .where(MatchQueue.id == uuid.UUID(queue_id))
+                            .values(status="failed", last_error=f"Max retries exceeded: {str(exc)}")
+                        )
+                        session.commit()
+                    except Exception:
+                        pass
+                raise
 
 
 @celery_app.task(name="app.tasks.run_baseline_test")

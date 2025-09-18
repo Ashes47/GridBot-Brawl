@@ -30,6 +30,19 @@ services:
     image: postgres:15-alpine
     env_file:
       - .env
+    environment:
+      - POSTGRES_DB=botbrawl
+      - POSTGRES_USER=botuser
+      - POSTGRES_PASSWORD=botpassword
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
@@ -88,7 +101,7 @@ services:
     networks:
       - botnet
     deploy:
-      replicas: 2
+      replicas: 1
 
   worker-simulation:
     build:
@@ -97,7 +110,7 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "simulation", "--concurrency", "${WORKER_SIM_CONCURRENCY:-12}", "-P", "threads", "-n", "simulation@%h"]
+    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "simulation", "--concurrency", "${WORKER_SIM_CONCURRENCY:-6}", "-P", "threads", "-n", "simulation@%h"]
     depends_on:
       - backend
       - redis
@@ -108,7 +121,7 @@ services:
     networks:
       - botnet
     deploy:
-      replicas: 4
+      replicas: 2
 
   worker-beat:
     build:

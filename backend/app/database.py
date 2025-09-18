@@ -15,11 +15,12 @@ engine = create_async_engine(
     DATABASE_URL, 
     echo=False, 
     future=True,
-    pool_size=20,  # Reduced to avoid hitting DB limits
-    max_overflow=30,  # Reduced to stay within PostgreSQL limits
+    pool_size=5,  # Very conservative pool size
+    max_overflow=10,  # Minimal overflow to stay well under limits
     pool_pre_ping=True,  # Verify connections before use
-    pool_recycle=1800,  # Recycle connections every 30 minutes
-    pool_timeout=30,  # Timeout for getting connection from pool
+    pool_recycle=300,  # Recycle connections every 5 minutes (faster)
+    pool_timeout=10,  # Shorter timeout for getting connection
+    pool_reset_on_return='commit',  # Reset connections on return
 )
 AsyncSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
 
