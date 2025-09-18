@@ -53,7 +53,7 @@ async def leaderboard(
     if baselines_visible:
         show_baselines = True
 
-    # Load ratings for this mode
+    # Load ratings for this mode (only valid teams)
     res = await session.execute(select(Rating, Team).join(Team, Team.id == Rating.team_id).where(Rating.mode == mode, Team.status == "valid"))
     rows = res.all()
 

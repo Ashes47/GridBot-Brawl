@@ -206,7 +206,7 @@ def validate_team_code(team_id: str) -> dict:
         session.execute(
             update(Team)
             .where(Team.id == uuid.UUID(team_id))
-            .values(status="testing", last_validated=datetime.utcnow())
+            .values(status="testing")
         )
         session.commit()
         
@@ -219,7 +219,7 @@ def validate_team_code(team_id: str) -> dict:
                 session.execute(
                     update(Team)
                     .where(Team.id == uuid.UUID(team_id))
-                    .values(status="valid", last_error=None)
+                    .values(status="valid")
                 )
                 session.commit()
                 return {"status": "success", "message": "Team code validated successfully"}
@@ -228,7 +228,7 @@ def validate_team_code(team_id: str) -> dict:
                 session.execute(
                     update(Team)
                     .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid", last_error="Baseline test failed")
+                    .values(status="invalid")
                 )
                 session.commit()
                 return {"status": "error", "message": "Team code failed baseline test"}
@@ -238,7 +238,7 @@ def validate_team_code(team_id: str) -> dict:
             session.execute(
                 update(Team)
                 .where(Team.id == uuid.UUID(team_id))
-                .values(status="invalid", last_error=str(exc))
+                .values(status="invalid")
             )
             session.commit()
             return {"status": "error", "message": f"Validation failed: {str(exc)}"}

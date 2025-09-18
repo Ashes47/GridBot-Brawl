@@ -19,8 +19,6 @@ from ..tasks import (
     inflate_sigma_for_inactive,
     reset_and_reenqueue_all,
     reset_and_reenqueue_team,
-    validate_team_code,
-    validate_all_teams,
 )
 from passlib.hash import bcrypt
 
@@ -270,40 +268,64 @@ async def bulk_signup(
     return {"status": "ok", "created": created, "skipped": skipped, "results": results}
 
 
-@router.post("/teams/validate/{team_id}")
-async def validate_team(team_id: str, x_admin_token: str | None = Header(None)):
+@router.post("/validate-team/{team_id}")
+async def validate_team(
+    team_id: str,
+    x_admin_token: str | None = Header(None),
+    session: AsyncSession = Depends(get_session),
+):
     """Validate a specific team's code against baseline."""
-    require_admin(x_admin_token)
-    out = validate_team_code.apply_async(args=[team_id], queue="baseline")
-    return {"status": "queued", "task_id": out.id}
-
-
-@router.post("/teams/validate-all")
-async def validate_all_teams_endpoint(x_admin_token: str | None = Header(None)):
-    """Validate all teams' code against baselines."""
-    require_admin(x_admin_token)
-    out = validate_all_teams.apply_async(queue="baseline")
-    return {"status": "queued", "task_id": out.id}
-
-
-@router.get("/teams/status")
-async def get_teams_status(x_admin_token: str | None = Header(None), session: AsyncSession = Depends(get_session)):
-    """Get status of all teams (valid/invalid/pending)."""
-    require_admin(x_admin_token)
+    if not x_admin_token or x_admin_token != os.getenv("ADMIN_TOKEN"):
+        raise HTTPException(status_code=403, detail="admin token required")
     
-    teams = await session.execute(
-        select(Team.id, Team.name, Team.status, Team.last_validated, Team.last_error)
-        .order_by(Team.name)
+    from ..tasks import validate_team_code
+    task = validate_team_code.apply_async(args=[team_id], queue="baseline")
+    return {"status": "queued", "task_id": task.id}
+
+
+@router.post("/validate-all-teams")
+async def validate_all_teams(
+    x_admin_token: str | None = Header(None),
+):
+    """Validate all teams against baselines."""
+    if not x_admin_token or x_admin_token != os.getenv("ADMIN_TOKEN"):
+        raise HTTPException(status_code=403, detail="admin token required")
+    
+    from ..tasks import validate_all_teams
+    task = validate_all_teams.apply_async(queue="baseline")
+    return {"status": "queued", "task_id": task.id}
+
+
+@router.get("/team-status")
+async def get_team_status(
+    session: AsyncSession = Depends(get_session),
+):
+    """Get status summary of all teams."""
+    from sqlalchemy import func
+    
+    # Count teams by status
+    status_counts = await session.execute(
+        select(Team.status, func.count(Team.id))
+        .group_by(Team.status)
+    )
+    status_summary = {status: count for status, count in status_counts.all()}
+    
+    # Get recent validation results
+    recent_teams = await session.execute(
+        select(Team.id, Team.name, Team.status)
+        .order_by(Team.created_at.desc())
+        .limit(20)
     )
     
-    results = []
-    for team_id, name, status, last_validated, last_error in teams:
-        results.append({
+    teams = []
+    for team_id, name, status in recent_teams.all():
+        teams.append({
             "id": str(team_id),
             "name": name,
-            "status": status,
-            "last_validated": last_validated.isoformat() if last_validated else None,
-            "last_error": last_error
+            "status": status
         })
     
-    return {"teams": results}
+    return {
+        "status_summary": status_summary,
+        "recent_teams": teams
+    }

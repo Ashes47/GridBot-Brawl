@@ -399,6 +399,7 @@ async def get_team(team_id: str, session: AsyncSession = Depends(get_session)):
         "created_at": team.created_at,
         "members": [m.name for m in team.members],
         "roster": (_json.loads(team.roster) if team.roster else None),
+        "status": getattr(team, 'status', 'pending'),  # Include team status
     }
 
 
@@ -410,10 +411,10 @@ async def list_teams(search: str | None = None, limit: int = 100, session: Async
     """Return a list of recent teams (default limit 100)."""
     from sqlalchemy import func
     query = (
-        select(Team.id, Team.name, Team.created_at, func.count(Member.id).label("mc"))
+        select(Team.id, Team.name, Team.created_at, Team.status, func.count(Member.id).label("mc"))
         .select_from(Team)
         .outerjoin(Member)
-        .group_by(Team.id)
+        .group_by(Team.id, Team.status)
         .order_by(Team.created_at.desc())
     )
     # Exclude baselines from directory when BASELINES_VISIBLE=false
@@ -431,6 +432,7 @@ async def list_teams(search: str | None = None, limit: int = 100, session: Async
             "name": r.name,
             "created_at": r.created_at,
             "member_count": r.mc,
+            "status": getattr(r, 'status', 'pending'),
         }
         for r in rows
     ]
