@@ -374,61 +374,85 @@ def enqueue_match(mode: str, team_ids: List[str], priority: str = "normal") -> d
 
 @celery_app.task(name="app.tasks.queue_consumer_once")
 def queue_consumer_once() -> dict:
-    """Pop one queued item observing per-team per-mode concurrency, create Match row, and enqueue run_match."""
+    """Pop queued items observing per-team per-mode concurrency, create Match rows, and enqueue run_match tasks."""
     import os
     from sqlalchemy import and_
     processed = 0
+    max_batch_size = int(os.getenv("QUEUE_BATCH_SIZE", "5"))  # Process up to 5 matches at once
+    max_concurrent_per_team = int(os.getenv("MAX_CONCURRENT_PER_TEAM", "8"))
+    
     with SessionLocal() as session:
-        # Fetch one queued item
-        row = (
+        # Fetch multiple queued items
+        rows = (
             session.query(MatchQueue)
             .filter(MatchQueue.status == "queued")
             .order_by(MatchQueue.created_at.asc())
-            .first()
+            .limit(max_batch_size)
+            .all()
         )
-        if not row:
+        if not rows:
             return {"processed": 0}
 
-        team_ids = [str(tid) for tid in row.team_ids]
-
-        # Concurrency guard: at most 3 running per team per mode (increased from 1)
-        max_concurrent_per_team = int(os.getenv("MAX_CONCURRENT_PER_TEAM", "3"))
-        for tid in team_ids:
-            count = (
-                session.query(Match)
-                .filter(
-                    and_(
-                        Match.mode == row.mode,
-                        Match.status == "running",
-                        Match.team_ids.like(f"%{tid}%"),
+        # Track team concurrency counts
+        team_concurrency = {}
+        
+        for row in rows:
+            team_ids = [str(tid) for tid in row.team_ids]
+            
+            # Check concurrency for all teams in this match
+            can_run = True
+            for tid in team_ids:
+                if tid not in team_concurrency:
+                    # Count current running matches for this team in this mode
+                    count = (
+                        session.query(Match)
+                        .filter(
+                            and_(
+                                Match.mode == row.mode,
+                                Match.status == "running",
+                                Match.team_ids.like(f"%{tid}%"),
+                            )
+                        )
+                        .count()
                     )
-                )
-                .count()
+                    team_concurrency[tid] = count
+                
+                if team_concurrency[tid] >= max_concurrent_per_team:
+                    can_run = False
+                    break
+            
+            if not can_run:
+                continue  # Skip this match, try next one
+            
+            # Create Match row
+            match_id = uuid.uuid4()
+            m = Match(
+                id=match_id,
+                mode=row.mode,
+                team_ids=",".join(sorted(team_ids)),
+                status="pending",
+                log_path="",
+                created_at=datetime.utcnow(),
             )
-            if count >= max_concurrent_per_team:
-                # Skip for now; leave queued
-                return {"processed": 0}
-
-        # Create Match row
-        match_id = uuid.uuid4()
-        m = Match(
-            id=match_id,
-            mode=row.mode,
-            team_ids=",".join(sorted(team_ids)),
-            status="pending",
-            log_path="",
-            created_at=datetime.utcnow(),
-        )
-        session.add(m)
-        session.flush()
-        # Mark queue running and enqueue simulation
-        session.execute(
-            update(MatchQueue).where(MatchQueue.id == row.id).values(status="running", attempts=row.attempts + 1)
-        )
+            session.add(m)
+            session.flush()
+            
+            # Mark queue running and enqueue simulation
+            session.execute(
+                update(MatchQueue).where(MatchQueue.id == row.id).values(status="running", attempts=row.attempts + 1)
+            )
+            
+            # Update concurrency counts
+            for tid in team_ids:
+                team_concurrency[tid] += 1
+            
+            # Enqueue the match
+            run_match.apply_async(args=[str(match_id), team_ids, str(row.id)], queue="simulation")
+            processed += 1
+        
         session.commit()
-        run_match.apply_async(args=[str(match_id), team_ids, str(row.id)], queue="simulation")
-        processed = 1
-    return {"processed": processed, "match_id": str(match_id), "queue_id": str(row.id)}
+    
+    return {"processed": processed}
 
 
 # ------------------------------------------------------------- Scheduler helpers

@@ -25,10 +25,10 @@ def _make_celery_app() -> Celery:
     if os.getenv("ENABLE_CELERY_BEAT", "true").lower() in ("1","true","yes"):
         app.conf.timezone = os.getenv("TZ", "UTC")
         app.conf.beat_schedule = {
-            # Process queued items more frequently for higher throughput
+            # Process queued items more frequently for higher throughput (optimized for 60 teams)
             "queue-consumer-once": {
                 "task": "app.tasks.queue_consumer_once",
-                "schedule": 0.2,  # seconds - 5x faster processing
+                "schedule": 0.05,  # seconds - 20x faster processing for high volume
             },
             # Run ongoing scheduler hourly
             "schedule-ongoing-hourly": {
