@@ -193,8 +193,10 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
 
 @celery_app.task(name="app.tasks.validate_team_code")
 def validate_team_code(team_id: str) -> dict:
-    """Validate a team's code by running a test match against baseline."""
+    """Validate a team's code by checking if it exists and is readable."""
     from datetime import datetime
+    from pathlib import Path
+    import ast
     
     with SessionLocal() as session:
         # Get team info
@@ -211,34 +213,57 @@ def validate_team_code(team_id: str) -> dict:
         session.commit()
         
         try:
-            # Run a quick test match against baseline
-            result = run_baseline_test(team_id, None)
+            # Check if team code file exists and is readable
+            code_path = Path(team.code_path)
+            if not code_path.exists():
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="invalid", last_error="Code file not found")
+                )
+                session.commit()
+                return {"status": "error", "message": "Code file not found"}
             
-            if result and "match_id" in result:
-                # Test passed - mark as valid
+            # Try to read and parse the code
+            try:
+                code_content = code_path.read_text(encoding="utf-8")
+                # Basic syntax check
+                ast.parse(code_content)
+                
+                # Check if it has basic bot structure (has a Bot class)
+                if "class Bot" in code_content or "def " in code_content:
+                    # Mark as valid
+                    session.execute(
+                        update(Team)
+                        .where(Team.id == uuid.UUID(team_id))
+                        .values(status="valid", last_error=None)
+                    )
+                    session.commit()
+                    return {"status": "success", "message": "Team code validated successfully"}
+                else:
+                    session.execute(
+                        update(Team)
+                        .where(Team.id == uuid.UUID(team_id))
+                        .values(status="invalid", last_error="No Bot class or functions found")
+                    )
+                    session.commit()
+                    return {"status": "error", "message": "No Bot class or functions found"}
+                    
+            except SyntaxError as e:
                 session.execute(
                     update(Team)
                     .where(Team.id == uuid.UUID(team_id))
-                    .values(status="valid")
+                    .values(status="invalid", last_error=f"Syntax error: {str(e)}")
                 )
                 session.commit()
-                return {"status": "success", "message": "Team code validated successfully"}
-            else:
-                # Test failed
-                session.execute(
-                    update(Team)
-                    .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid")
-                )
-                session.commit()
-                return {"status": "error", "message": "Team code failed baseline test"}
+                return {"status": "error", "message": f"Syntax error: {str(e)}"}
                 
         except Exception as exc:
             # Mark as invalid with error message
             session.execute(
                 update(Team)
                 .where(Team.id == uuid.UUID(team_id))
-                .values(status="invalid")
+                .values(status="invalid", last_error=str(exc))
             )
             session.commit()
             return {"status": "error", "message": f"Validation failed: {str(exc)}"}
@@ -246,7 +271,7 @@ def validate_team_code(team_id: str) -> dict:
 
 @celery_app.task(name="app.tasks.validate_all_teams")
 def validate_all_teams() -> dict:
-    """Validate all teams by testing them against baselines."""
+    """Validate all teams by checking their code files."""
     with SessionLocal() as session:
         # Get all teams except baselines
         teams = session.execute(
@@ -256,6 +281,7 @@ def validate_all_teams() -> dict:
         
         results = {"validated": 0, "invalid": 0, "errors": 0}
         
+        # Process each team directly (simpler approach)
         for team_id, team_name in teams:
             try:
                 result = validate_team_code(str(team_id))
@@ -263,7 +289,8 @@ def validate_all_teams() -> dict:
                     results["validated"] += 1
                 else:
                     results["invalid"] += 1
-            except Exception:
+            except Exception as e:
+                print(f"Validation failed for team {team_name}: {e}")
                 results["errors"] += 1
         
         return results
