@@ -73,6 +73,12 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
         session.commit()
         try:
             async def _go():
+                from .database import check_db_availability
+                
+                # Check if database can accept more connections before starting
+                if not await check_db_availability():
+                    raise Exception("Database connection limit reached, task will be retried")
+                
                 AsyncSessionMaker = get_async_sessionmaker()
                 async with AsyncSessionMaker() as a_sess:
                     return await simulate_match(a_sess, team_ids, seed=seed, match_id=match_id)
@@ -147,6 +153,12 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
                     pass
             return None
         except Exception as exc:
+            # Check if this is a database connection error
+            is_db_connection_error = (
+                "too many clients" in str(exc).lower() or
+                "connection" in str(exc).lower() and "failed" in str(exc).lower()
+            )
+            
             # Check if we should retry this task
             if self.request.retries < self.max_retries:
                 # Log the retry attempt
@@ -154,29 +166,33 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
                 logging.warning(f"Match {match_id} failed (attempt {self.request.retries + 1}/{self.max_retries + 1}), retrying: {str(exc)}")
                 
                 # Mark as retrying in database
-                session.execute(
-                    update(Match).where(Match.id == uuid.UUID(match_id)).values(status="retrying")
-                )
-                session.commit()
+                try:
+                    session.execute(
+                        update(Match).where(Match.id == uuid.UUID(match_id)).values(status="retrying")
+                    )
+                    session.commit()
+                except Exception:
+                    pass  # Don't fail if we can't update the database
                 
-                # Retry the task
-                raise self.retry(countdown=60, exc=exc)
+                # Use longer retry delay for database connection issues
+                retry_delay = 120 if is_db_connection_error else 60
+                raise self.retry(countdown=retry_delay, exc=exc)
             else:
                 # Max retries exceeded, mark as failed
-                session.execute(
-                    update(Match).where(Match.id == uuid.UUID(match_id)).values(status="error")
-                )
-                session.commit()
-                if queue_id:
-                    try:
+                try:
+                    session.execute(
+                        update(Match).where(Match.id == uuid.UUID(match_id)).values(status="error")
+                    )
+                    session.commit()
+                    if queue_id:
                         session.execute(
                             update(MatchQueue)
                             .where(MatchQueue.id == uuid.UUID(queue_id))
                             .values(status="failed", last_error=f"Max retries exceeded: {str(exc)}")
                         )
                         session.commit()
-                    except Exception:
-                        pass
+                except Exception:
+                    pass  # Don't fail if we can't update the database
                 raise
 
 
@@ -394,8 +410,18 @@ def queue_consumer_once() -> dict:
     import os
     from sqlalchemy import and_
     processed = 0
-    max_batch_size = int(os.getenv("QUEUE_BATCH_SIZE", "5"))  # Process up to 5 matches at once
-    max_concurrent_per_team = int(os.getenv("MAX_CONCURRENT_PER_TEAM", "8"))
+    max_batch_size = int(os.getenv("QUEUE_BATCH_SIZE", "3"))  # Process up to 3 matches at once
+    max_concurrent_per_team = int(os.getenv("MAX_CONCURRENT_PER_TEAM", "4"))
+    
+    # Check database availability before processing
+    try:
+        from sqlalchemy import text
+        with SessionLocal() as session:
+            # Quick check if we can get a connection
+            session.execute(text("SELECT 1")).scalar()
+    except Exception:
+        # If we can't get a connection, skip this run
+        return {"processed": 0, "reason": "database_unavailable"}
     
     with SessionLocal() as session:
         # Fetch multiple queued items
