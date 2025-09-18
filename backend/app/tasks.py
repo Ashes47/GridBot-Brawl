@@ -193,10 +193,11 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
 
 @celery_app.task(name="app.tasks.validate_team_code")
 def validate_team_code(team_id: str) -> dict:
-    """Validate a team's code by checking syntax and running a test match against baseline."""
+    """Validate a team's code by running an actual match against baseline."""
     from datetime import datetime
-    import ast
-    import traceback
+    import asyncio
+    from pathlib import Path
+    import json
     
     with SessionLocal() as session:
         # Get team info
@@ -213,54 +214,63 @@ def validate_team_code(team_id: str) -> dict:
         session.commit()
         
         try:
-            # Step 1: Check Python syntax by parsing the file
-            try:
-                with open(team.code_path, 'r') as f:
-                    code_content = f.read()
-                
-                # Parse the code to check for syntax errors
-                ast.parse(code_content)
-            except SyntaxError as e:
-                error_msg = f"Syntax error in team code: {str(e)}"
-                session.execute(
-                    update(Team)
-                    .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid", last_error=error_msg)
-                )
-                session.commit()
-                return {"status": "error", "message": error_msg}
-            except Exception as e:
-                error_msg = f"Error reading team code file: {str(e)}"
-                session.execute(
-                    update(Team)
-                    .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid", last_error=error_msg)
-                )
-                session.commit()
-                return {"status": "error", "message": error_msg}
+            # Create baseline team if needed
+            base_dir = Path(os.getenv("DATA_DIR", "./data/teams")) / "baseline"
+            base_dir.mkdir(parents=True, exist_ok=True)
+            bot_path = base_dir / "bot.py"
+            src = Path(__file__).resolve().parent / "engine" / "baseline_bot.py"
+            bot_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
             
-            # Step 2: Try to import the module to catch import errors
+            # Get or create baseline team
+            baseline_team = session.execute(select(Team).where(Team.name == "Baseline")).scalar_one_or_none()
+            if not baseline_team:
+                baseline_team = Team(name="Baseline", code_path=str(bot_path), password_hash="!")
+                session.add(baseline_team)
+                session.flush()
+            else:
+                baseline_team.code_path = str(bot_path)
+            
+            # Create a test match
+            match_id = uuid.uuid4()
+            match = Match(
+                id=match_id,
+                mode="duo",
+                team_ids=",".join([team_id, str(baseline_team.id)]),
+                status="pending",
+                log_path="",
+                created_at=datetime.utcnow(),
+            )
+            session.add(match)
+            session.flush()
+            session.commit()
+            
+            # Run the match synchronously using the simulation engine
             try:
-                import importlib.util
-                import sys
-                from pathlib import Path
+                # Import the simulation function
+                from app.simulation import simulate_match
+                from app.database import get_async_sessionmaker
                 
-                spec = importlib.util.spec_from_file_location("team_bot", team.code_path)
-                if spec is None or spec.loader is None:
-                    raise ImportError("Could not load module spec")
+                # Run the match
+                async def _run_validation_match():
+                    AsyncSessionMaker = get_async_sessionmaker()
+                    async with AsyncSessionMaker() as a_sess:
+                        return await simulate_match(a_sess, [team_id, str(baseline_team.id)], seed=42, match_id=str(match_id))
                 
-                module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
+                # Execute the async function
+                result = asyncio.run(_run_validation_match())
                 
-                # Check if required classes exist
-                required_classes = ['Bot']
-                missing_classes = []
-                for cls_name in required_classes:
-                    if not hasattr(module, cls_name):
-                        missing_classes.append(cls_name)
-                
-                if missing_classes:
-                    error_msg = f"Missing required classes: {', '.join(missing_classes)}"
+                if result and result.get("status") == "completed":
+                    # Match succeeded - mark as valid
+                    session.execute(
+                        update(Team)
+                        .where(Team.id == uuid.UUID(team_id))
+                        .values(status="valid", last_error=None)
+                    )
+                    session.commit()
+                    return {"status": "success", "message": "Team code validated successfully"}
+                else:
+                    # Match failed - mark as invalid
+                    error_msg = f"Match failed: {result.get('error', 'Unknown error') if result else 'No result'}"
                     session.execute(
                         update(Team)
                         .where(Team.id == uuid.UUID(team_id))
@@ -268,32 +278,10 @@ def validate_team_code(team_id: str) -> dict:
                     )
                     session.commit()
                     return {"status": "error", "message": error_msg}
-                
-            except Exception as e:
-                error_msg = f"Import error in team code: {str(e)}"
-                session.execute(
-                    update(Team)
-                    .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid", last_error=error_msg)
-                )
-                session.commit()
-                return {"status": "error", "message": error_msg}
-            
-            # Step 3: Run a quick test match against baseline
-            result = run_baseline_test(team_id, None)
-            
-            if result and "match_id" in result:
-                # Test passed - mark as valid
-                session.execute(
-                    update(Team)
-                    .where(Team.id == uuid.UUID(team_id))
-                    .values(status="valid", last_error=None)
-                )
-                session.commit()
-                return {"status": "success", "message": "Team code validated successfully"}
-            else:
-                # Test failed
-                error_msg = "Team code failed baseline test"
+                    
+            except Exception as match_exc:
+                # Match execution failed - mark as invalid
+                error_msg = f"Match execution failed: {str(match_exc)}"
                 session.execute(
                     update(Team)
                     .where(Team.id == uuid.UUID(team_id))
