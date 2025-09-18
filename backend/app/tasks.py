@@ -375,6 +375,7 @@ def enqueue_match(mode: str, team_ids: List[str], priority: str = "normal") -> d
 @celery_app.task(name="app.tasks.queue_consumer_once")
 def queue_consumer_once() -> dict:
     """Pop one queued item observing per-team per-mode concurrency, create Match row, and enqueue run_match."""
+    import os
     from sqlalchemy import and_
     processed = 0
     with SessionLocal() as session:
@@ -390,9 +391,10 @@ def queue_consumer_once() -> dict:
 
         team_ids = [str(tid) for tid in row.team_ids]
 
-        # Concurrency guard: at most 1 running per team per mode
+        # Concurrency guard: at most 3 running per team per mode (increased from 1)
+        max_concurrent_per_team = int(os.getenv("MAX_CONCURRENT_PER_TEAM", "3"))
         for tid in team_ids:
-            exists = (
+            count = (
                 session.query(Match)
                 .filter(
                     and_(
@@ -401,9 +403,9 @@ def queue_consumer_once() -> dict:
                         Match.team_ids.like(f"%{tid}%"),
                     )
                 )
-                .first()
+                .count()
             )
-            if exists:
+            if count >= max_concurrent_per_team:
                 # Skip for now; leave queued
                 return {"processed": 0}
 

@@ -77,7 +77,7 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "baseline", "--concurrency", "${WORKER_BASE_CONCURRENCY:-4}", "-P", "threads", "-n", "baseline@%h"]
+    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "baseline", "--concurrency", "${WORKER_BASE_CONCURRENCY:-8}", "-P", "threads", "-n", "baseline@%h"]
     depends_on:
       - backend
       - redis
@@ -87,6 +87,8 @@ services:
       - ./maps:/app/maps
     networks:
       - botnet
+    deploy:
+      replicas: 2
 
   worker-simulation:
     build:
@@ -95,7 +97,7 @@ services:
       - .env
     environment:
       - PYTHONPATH=/app
-    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "simulation", "--concurrency", "${WORKER_SIM_CONCURRENCY:-8}", "-P", "threads", "-n", "simulation@%h"]
+    command: ["celery", "-A", "app.celery_app.celery_app", "worker", "-Q", "simulation", "--concurrency", "${WORKER_SIM_CONCURRENCY:-16}", "-P", "threads", "-n", "simulation@%h"]
     depends_on:
       - backend
       - redis
@@ -105,6 +107,8 @@ services:
       - ./maps:/app/maps
     networks:
       - botnet
+    deploy:
+      replicas: 6
 
   worker-beat:
     build:

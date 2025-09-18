@@ -153,6 +153,9 @@ async def bulk_signup(
     """Mass register teams from a CSV. Accepts an uploaded CSV or a server path.
 
     Expected columns: Team Name, Member Emails (comma-separated), Team Password.
+    Supports the registration.csv schema:
+    - Timestamp, Email address, Team Name, Team Leader Name, Team Leader Email, 
+      Member 1-3 Emails, Team Password
     If columns differ, we attempt to infer by header names.
     """
     require_admin(x_admin_token)
