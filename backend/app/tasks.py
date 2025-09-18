@@ -211,9 +211,8 @@ def validate_team_code(team_id: str) -> dict:
         session.commit()
         
         try:
-            # Run a test match against baseline (async function)
-            import asyncio
-            result = asyncio.run(run_baseline_test(team_id, None))
+            # Run a test match against baseline
+            result = run_baseline_test(team_id, None)
             
             if result and "match_id" in result:
                 # Test passed - mark as valid
