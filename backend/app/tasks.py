@@ -195,9 +195,6 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
 def validate_team_code(team_id: str) -> dict:
     """Validate a team's code by running an actual match against baseline."""
     from datetime import datetime
-    import asyncio
-    from pathlib import Path
-    import json
     
     with SessionLocal() as session:
         # Get team info
@@ -214,73 +211,22 @@ def validate_team_code(team_id: str) -> dict:
         session.commit()
         
         try:
-            # Create baseline team if needed
-            base_dir = Path(os.getenv("DATA_DIR", "./data/teams")) / "baseline"
-            base_dir.mkdir(parents=True, exist_ok=True)
-            bot_path = base_dir / "bot.py"
-            src = Path(__file__).resolve().parent / "engine" / "baseline_bot.py"
-            bot_path.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+            # Run a test match against baseline (async function)
+            import asyncio
+            result = asyncio.run(run_baseline_test(team_id, None))
             
-            # Get or create baseline team
-            baseline_team = session.execute(select(Team).where(Team.name == "Baseline")).scalar_one_or_none()
-            if not baseline_team:
-                baseline_team = Team(name="Baseline", code_path=str(bot_path), password_hash="!")
-                session.add(baseline_team)
-                session.flush()
+            if result and "match_id" in result:
+                # Test passed - mark as valid
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="valid", last_error=None)
+                )
+                session.commit()
+                return {"status": "success", "message": "Team code validated successfully"}
             else:
-                baseline_team.code_path = str(bot_path)
-            
-            # Create a test match
-            match_id = uuid.uuid4()
-            match = Match(
-                id=match_id,
-                mode="duo",
-                team_ids=",".join([team_id, str(baseline_team.id)]),
-                status="pending",
-                log_path="",
-                created_at=datetime.utcnow(),
-            )
-            session.add(match)
-            session.flush()
-            session.commit()
-            
-            # Run the match synchronously using the simulation engine
-            try:
-                # Import the simulation function
-                from app.simulation import simulate_match
-                from app.database import AsyncSessionLocal
-                
-                # Run the match
-                async def _run_validation_match():
-                    async with AsyncSessionLocal() as a_sess:
-                        return await simulate_match(a_sess, [team_id, str(baseline_team.id)], seed=42, match_id=str(match_id))
-                
-                # Execute the async function
-                result = asyncio.run(_run_validation_match())
-                
-                if result and result.get("status") == "completed":
-                    # Match succeeded - mark as valid
-                    session.execute(
-                        update(Team)
-                        .where(Team.id == uuid.UUID(team_id))
-                        .values(status="valid", last_error=None)
-                    )
-                    session.commit()
-                    return {"status": "success", "message": "Team code validated successfully"}
-                else:
-                    # Match failed - mark as invalid
-                    error_msg = f"Match failed: {result.get('error', 'Unknown error') if result else 'No result'}"
-                    session.execute(
-                        update(Team)
-                        .where(Team.id == uuid.UUID(team_id))
-                        .values(status="invalid", last_error=error_msg)
-                    )
-                    session.commit()
-                    return {"status": "error", "message": error_msg}
-                    
-            except Exception as match_exc:
-                # Match execution failed - mark as invalid
-                error_msg = f"Match execution failed: {str(match_exc)}"
+                # Test failed
+                error_msg = "Team code failed baseline test"
                 session.execute(
                     update(Team)
                     .where(Team.id == uuid.UUID(team_id))
