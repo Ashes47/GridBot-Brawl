@@ -248,12 +248,11 @@ def validate_team_code(team_id: str) -> dict:
             try:
                 # Import the simulation function
                 from app.simulation import simulate_match
-                from app.database import get_async_sessionmaker
+                from app.database import AsyncSessionLocal
                 
                 # Run the match
                 async def _run_validation_match():
-                    AsyncSessionMaker = get_async_sessionmaker()
-                    async with AsyncSessionMaker() as a_sess:
+                    async with AsyncSessionLocal() as a_sess:
                         return await simulate_match(a_sess, [team_id, str(baseline_team.id)], seed=42, match_id=str(match_id))
                 
                 # Execute the async function
