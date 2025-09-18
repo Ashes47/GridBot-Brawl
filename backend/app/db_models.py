@@ -21,6 +21,10 @@ class Team(Base):
     # Calibration progress counters per mode (0-12)
     calibration_progress_duo = Column(Integer, nullable=False, default=0)
     calibration_progress_quad = Column(Integer, nullable=False, default=0)
+    # Team validation status
+    status = Column(String(20), nullable=False, default="pending")  # pending, valid, invalid, testing
+    last_validated = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
 
 
 class Member(Base):

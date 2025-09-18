@@ -191,6 +191,84 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
                 raise
 
 
+@celery_app.task(name="app.tasks.validate_team_code")
+def validate_team_code(team_id: str) -> dict:
+    """Validate a team's code by running a test match against baseline."""
+    from datetime import datetime
+    
+    with SessionLocal() as session:
+        # Get team info
+        team = session.get(Team, uuid.UUID(team_id))
+        if not team:
+            return {"status": "error", "message": "Team not found"}
+        
+        # Update status to testing
+        session.execute(
+            update(Team)
+            .where(Team.id == uuid.UUID(team_id))
+            .values(status="testing", last_validated=datetime.utcnow())
+        )
+        session.commit()
+        
+        try:
+            # Run a quick test match against baseline
+            result = run_baseline_test(team_id, None)
+            
+            if result and "match_id" in result:
+                # Test passed - mark as valid
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="valid", last_error=None)
+                )
+                session.commit()
+                return {"status": "success", "message": "Team code validated successfully"}
+            else:
+                # Test failed
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="invalid", last_error="Baseline test failed")
+                )
+                session.commit()
+                return {"status": "error", "message": "Team code failed baseline test"}
+                
+        except Exception as exc:
+            # Mark as invalid with error message
+            session.execute(
+                update(Team)
+                .where(Team.id == uuid.UUID(team_id))
+                .values(status="invalid", last_error=str(exc))
+            )
+            session.commit()
+            return {"status": "error", "message": f"Validation failed: {str(exc)}"}
+
+
+@celery_app.task(name="app.tasks.validate_all_teams")
+def validate_all_teams() -> dict:
+    """Validate all teams by testing them against baselines."""
+    with SessionLocal() as session:
+        # Get all teams except baselines
+        teams = session.execute(
+            select(Team.id, Team.name)
+            .where(Team.name.notlike("baseline%"))
+        ).all()
+        
+        results = {"validated": 0, "invalid": 0, "errors": 0}
+        
+        for team_id, team_name in teams:
+            try:
+                result = validate_team_code(str(team_id))
+                if result["status"] == "success":
+                    results["validated"] += 1
+                else:
+                    results["invalid"] += 1
+            except Exception:
+                results["errors"] += 1
+        
+        return results
+
+
 @celery_app.task(name="app.tasks.run_baseline_test")
 def run_baseline_test(team_id: str, baseline_roster: List[str] | None = None) -> dict:
     """Create baseline team if needed, create Match, and enqueue run_match on baseline queue.
@@ -259,9 +337,9 @@ def schedule_evaluation_for_team(team_id: str) -> dict:
     """
     created = {"duo": 0, "quad": 0}
     with SessionLocal() as session:
-        # Fetch all teams except Baseline
-        rows = session.execute(select(Team.id, Team.name)).all()
-        team_ids = [str(tid) for tid, name in rows if (name or "").lower() != "baseline"]
+        # Fetch all valid teams except Baseline
+        rows = session.execute(select(Team.id, Team.name, Team.status).where(Team.status == "valid")).all()
+        team_ids = [str(tid) for tid, name, status in rows if (name or "").lower() != "baseline"]
         if team_id not in team_ids:
             team_ids.append(team_id)
         # dedupe
@@ -325,8 +403,8 @@ def schedule_full_evaluation() -> dict:
     """
     created = {"duo": 0, "quad": 0}
     with SessionLocal() as session:
-        rows = session.execute(select(Team.id, Team.name)).all()
-        team_ids = [str(tid) for tid, name in rows if (name or "").lower() != "baseline"]
+        rows = session.execute(select(Team.id, Team.name, Team.status).where(Team.status == "valid")).all()
+        team_ids = [str(tid) for tid, name, status in rows if (name or "").lower() != "baseline"]
 
         # Duo combinations
         for a, b in combinations(team_ids, 2):
@@ -691,7 +769,7 @@ def schedule_ongoing() -> dict:
     with SessionLocal() as session:
         ratings_duo = _ratings_for_mode(session, "duo")
         ratings_quad = _ratings_for_mode(session, "quad")
-        all_team_ids = [str(tid) for (tid,) in session.execute(select(Team.id)).all()]
+        all_team_ids = [str(tid) for (tid,) in session.execute(select(Team.id).where(Team.status == "valid")).all()]
         baselines = set(_baseline_ids(session))
         # Count pending+running today per team/mode
         now = datetime.utcnow()
@@ -931,9 +1009,9 @@ def reset_and_reenqueue_all() -> dict:
         except Exception:
             # non-fatal
             pass
-        # Enqueue calibration for all non-baseline teams
-        rows = session.execute(select(Team.id, Team.name)).all()
-        for tid, name in rows:
+        # Enqueue calibration for all valid non-baseline teams
+        rows = session.execute(select(Team.id, Team.name, Team.status).where(Team.status == "valid")).all()
+        for tid, name, status in rows:
             if (name or "").lower() in baseline_names:
                 continue
             schedule_calibration_for_team.apply_async(args=[str(tid)], queue="simulation")

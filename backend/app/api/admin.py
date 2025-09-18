@@ -19,6 +19,8 @@ from ..tasks import (
     inflate_sigma_for_inactive,
     reset_and_reenqueue_all,
     reset_and_reenqueue_team,
+    validate_team_code,
+    validate_all_teams,
 )
 from passlib.hash import bcrypt
 
@@ -266,3 +268,42 @@ async def bulk_signup(
 
     await session.flush()
     return {"status": "ok", "created": created, "skipped": skipped, "results": results}
+
+
+@router.post("/teams/validate/{team_id}")
+async def validate_team(team_id: str, x_admin_token: str | None = Header(None)):
+    """Validate a specific team's code against baseline."""
+    require_admin(x_admin_token)
+    out = validate_team_code.apply_async(args=[team_id], queue="baseline")
+    return {"status": "queued", "task_id": out.id}
+
+
+@router.post("/teams/validate-all")
+async def validate_all_teams_endpoint(x_admin_token: str | None = Header(None)):
+    """Validate all teams' code against baselines."""
+    require_admin(x_admin_token)
+    out = validate_all_teams.apply_async(queue="baseline")
+    return {"status": "queued", "task_id": out.id}
+
+
+@router.get("/teams/status")
+async def get_teams_status(x_admin_token: str | None = Header(None), session: AsyncSession = Depends(get_session)):
+    """Get status of all teams (valid/invalid/pending)."""
+    require_admin(x_admin_token)
+    
+    teams = await session.execute(
+        select(Team.id, Team.name, Team.status, Team.last_validated, Team.last_error)
+        .order_by(Team.name)
+    )
+    
+    results = []
+    for team_id, name, status, last_validated, last_error in teams:
+        results.append({
+            "id": str(team_id),
+            "name": name,
+            "status": status,
+            "last_validated": last_validated.isoformat() if last_validated else None,
+            "last_error": last_error
+        })
+    
+    return {"teams": results}
