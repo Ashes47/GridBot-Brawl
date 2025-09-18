@@ -73,12 +73,7 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
         session.commit()
         try:
             async def _go():
-                from .database import check_db_availability
-                
-                # Check if database can accept more connections before starting
-                if not await check_db_availability():
-                    raise Exception("Database connection limit reached, task will be retried")
-                
+                # Skip database availability check for 23 teams - be more aggressive
                 AsyncSessionMaker = get_async_sessionmaker()
                 async with AsyncSessionMaker() as a_sess:
                     return await simulate_match(a_sess, team_ids, seed=seed, match_id=match_id)
@@ -413,15 +408,17 @@ def queue_consumer_once() -> dict:
     max_batch_size = int(os.getenv("QUEUE_BATCH_SIZE", "3"))  # Process up to 3 matches at once
     max_concurrent_per_team = int(os.getenv("MAX_CONCURRENT_PER_TEAM", "4"))
     
-    # Check database availability before processing
+    # Check database availability before processing (more lenient for 23 teams)
     try:
         from sqlalchemy import text
         with SessionLocal() as session:
             # Quick check if we can get a connection
             session.execute(text("SELECT 1")).scalar()
-    except Exception:
-        # If we can't get a connection, skip this run
-        return {"processed": 0, "reason": "database_unavailable"}
+    except Exception as e:
+        # Log the error but don't skip processing for 23 teams
+        import logging
+        logging.warning(f"Database check failed but continuing: {str(e)}")
+        # Continue processing instead of skipping
     
     with SessionLocal() as session:
         # Fetch multiple queued items
