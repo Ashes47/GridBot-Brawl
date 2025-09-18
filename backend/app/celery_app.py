@@ -23,11 +23,11 @@ def _make_celery_app() -> Celery:
     app.conf.worker_hijack_root_logger = False
     
     # Retry configuration for failed tasks
-    app.conf.task_default_retry_delay = 60  # 1 minute delay between retries
-    app.conf.task_max_retries = 3  # Maximum 3 retries per task
+    app.conf.task_default_retry_delay = 60 * 5 # 5 minute delay between retries
+    app.conf.task_max_retries = 3 # Maximum 5 retries per task
     app.conf.task_retry_jitter = True  # Add random jitter to retry delays
     app.conf.task_retry_backoff = True  # Exponential backoff
-    app.conf.task_retry_backoff_max = 600  # Max 10 minutes between retries
+    app.conf.task_retry_backoff_max = 5 * 60 * 10  # Max 10 minutes between retries
     # Optional periodic schedules (enable if running celery beat)
     if os.getenv("ENABLE_CELERY_BEAT", "true").lower() in ("1","true","yes"):
         app.conf.timezone = os.getenv("TZ", "UTC")
