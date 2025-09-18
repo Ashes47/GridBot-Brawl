@@ -70,6 +70,12 @@
           <button id="btn-search">Search</button>
           <span class="muted">Selected Team: <span id="selected-team" class="pill">None</span></span>
         </div>
+        <div class="muted" style="margin-bottom:10px;">
+          Team status: <span class="pill" style="background: rgba(34,197,94,.2)">valid</span> = working code, 
+          <span class="pill" style="background: rgba(239,68,68,.2)">invalid</span> = broken code, 
+          <span class="pill" style="background: rgba(245,158,11,.2)">testing</span> = being tested, 
+          <span class="pill" style="background: rgba(107,114,128,.2)">pending</span> = not tested yet
+        </div>
         <ul id="team-results"></ul>
       </div>
 
@@ -141,6 +147,28 @@
         </div>
 
         <div class="card">
+          <h3>Team Testing</h3>
+          <p class="desc">- <strong>Test All Teams</strong>: Test all teams against baselines to validate their code.<br>
+            - <strong>Team Status</strong>: View current validation status of all teams.<br>
+            - <strong>Test Selected Team</strong>: Test only the selected team against baselines.</p>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-test-all">Test All Teams</button>
+            <button id="btn-team-status">Team Status</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button id="btn-test-selected">Test Selected Team</button>
+            <span class="muted" id="test-progress"></span>
+          </div>
+          <div class="muted" id="test-status"></div>
+          <div id="team-status-display" style="margin-top:10px; display:none;">
+            <h4>Team Status Summary</h4>
+            <div id="status-summary"></div>
+            <h4>Recent Teams</h4>
+            <ul id="recent-teams-list"></ul>
+          </div>
+        </div>
+
+        <div class="card">
           <h3>Team Admin</h3>
           <p class="desc">- <strong>Reset Password</strong>: Set a new password for the selected team (requires admin password).<br>
             - <strong>Delete Team</strong>: Permanently delete the selected team and its code from disk (requires admin password).</p>
@@ -174,6 +202,10 @@
         teamListAll: `http://localhost:8000/teams?limit=10000`,
         teamResetPassword: (id)=>`http://localhost:8000/teams/${id}/reset_password`,
         teamDelete: (id)=>`http://localhost:8000/teams/${id}`,
+        testAllTeams: 'http://localhost:8000/admin/test-all-teams',
+        testTeam: (teamId)=>`http://localhost:8000/admin/validate-team/${teamId}`,
+        teamStatus: 'http://localhost:8000/admin/team-status',
+        testStatus: (taskId)=>`http://localhost:8000/admin/test-status/${taskId}`,
       };
 
       const els = (id)=>document.getElementById(id);
@@ -181,6 +213,7 @@
       let ADMIN_PASS = localStorage.getItem('admin_pass') || '';
       let SELECTED_TEAM_ID = null;
       let TEAM_CACHE = [];
+      let CURRENT_TEST_TASK_ID = null;
 
       function loadCreds(){
         els('admin-token').value = ADMIN_TOKEN;
@@ -202,7 +235,12 @@
         list.forEach(it=>{
           const li = document.createElement('li');
           const left = document.createElement('div');
-          left.textContent = `${it.name}`;
+          const statusBadge = document.createElement('span');
+          statusBadge.className = 'pill';
+          statusBadge.textContent = it.status || 'pending';
+          statusBadge.style.background = getStatusColor(it.status);
+          left.innerHTML = `${it.name} `;
+          left.appendChild(statusBadge);
           const right = document.createElement('div');
           const pick = document.createElement('button');
           pick.textContent = 'Select';
@@ -213,6 +251,15 @@
           li.appendChild(left); li.appendChild(right);
           ul.appendChild(li);
         });
+      }
+
+      function getStatusColor(status) {
+        switch(status) {
+          case 'valid': return 'rgba(34,197,94,.2)'; // green
+          case 'invalid': return 'rgba(239,68,68,.2)'; // red
+          case 'testing': return 'rgba(245,158,11,.2)'; // yellow
+          default: return 'rgba(107,114,128,.2)'; // gray
+        }
       }
 
       function filterTeams(){
@@ -230,6 +277,98 @@
           TEAM_CACHE.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
           renderTeams(TEAM_CACHE);
         } catch(e) { /* ignore */ }
+      }
+
+      async function testAllTeams(){
+        try {
+          setStatus('test-status', 'Starting test all teams...');
+          const response = await fetch(api.testAllTeams, { method: 'POST', headers: headers() });
+          if(!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          CURRENT_TEST_TASK_ID = data.task_id;
+          setStatus('test-status', 'Test queued, monitoring progress...');
+          monitorTestProgress();
+        } catch(e) {
+          setStatus('test-status', 'Failed: ' + e.message);
+        }
+      }
+
+      async function testSelectedTeam(){
+        if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
+        try {
+          setStatus('test-status', 'Testing selected team...');
+          const response = await fetch(api.testTeam(SELECTED_TEAM_ID), { method: 'POST', headers: headers() });
+          if(!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          setStatus('test-status', 'Test queued for selected team');
+          // Refresh team list to show updated status
+          setTimeout(loadAllTeams, 2000);
+        } catch(e) {
+          setStatus('test-status', 'Failed: ' + e.message);
+        }
+      }
+
+      async function showTeamStatus(){
+        try {
+          setStatus('test-status', 'Loading team status...');
+          const response = await fetch(api.teamStatus, { headers: headers() });
+          if(!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          
+          // Show status summary
+          const summaryDiv = els('status-summary');
+          summaryDiv.innerHTML = '';
+          for(const [status, count] of Object.entries(data.status_summary)) {
+            const div = document.createElement('div');
+            div.innerHTML = `<span class="pill" style="background: ${getStatusColor(status)}">${status}</span>: ${count} teams`;
+            summaryDiv.appendChild(div);
+          }
+          
+          // Show recent teams
+          const recentList = els('recent-teams-list');
+          recentList.innerHTML = '';
+          data.recent_teams.forEach(team => {
+            const li = document.createElement('li');
+            const statusBadge = document.createElement('span');
+            statusBadge.className = 'pill';
+            statusBadge.textContent = team.status;
+            statusBadge.style.background = getStatusColor(team.status);
+            li.innerHTML = `${team.name} `;
+            li.appendChild(statusBadge);
+            recentList.appendChild(li);
+          });
+          
+          els('team-status-display').style.display = 'block';
+          setStatus('test-status', 'Team status loaded');
+        } catch(e) {
+          setStatus('test-status', 'Failed: ' + e.message);
+        }
+      }
+
+      async function monitorTestProgress(){
+        if(!CURRENT_TEST_TASK_ID) return;
+        
+        try {
+          const response = await fetch(api.testStatus(CURRENT_TEST_TASK_ID), { headers: headers() });
+          if(!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          
+          if(data.status === 'success') {
+            setStatus('test-status', `Test completed! ${data.result.validated} valid, ${data.result.invalid} invalid, ${data.result.errors} errors`);
+            CURRENT_TEST_TASK_ID = null;
+            loadAllTeams(); // Refresh team list
+          } else if(data.status === 'failed') {
+            setStatus('test-status', 'Test failed: ' + data.error);
+            CURRENT_TEST_TASK_ID = null;
+          } else {
+            setStatus('test-progress', data.message);
+            // Continue monitoring
+            setTimeout(monitorTestProgress, 2000);
+          }
+        } catch(e) {
+          setStatus('test-status', 'Failed to monitor progress: ' + e.message);
+          CURRENT_TEST_TASK_ID = null;
+        }
       }
 
       document.addEventListener('DOMContentLoaded', ()=>{
@@ -271,6 +410,11 @@
         els('btn-inflate').onclick = async ()=>{ try { setStatus('ratings-status','Queuing…'); await doPost(api.ratingsInflate); setStatus('ratings-status','Queued'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
         els('btn-leaderboard-rebuild').onclick = async ()=>{ try { setStatus('ratings-status','Queuing…'); await doPost(api.leaderboardRebuild); setStatus('ratings-status','Queued'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
         els('btn-seed-baselines').onclick = async ()=>{ try { setStatus('ratings-status','Seeding…'); await doPost(api.baselinesSeed); setStatus('ratings-status','Done'); } catch(e){ setStatus('ratings-status','Failed'); alert(e.message); } };
+
+        // Team testing
+        els('btn-test-all').onclick = testAllTeams;
+        els('btn-test-selected').onclick = testSelectedTeam;
+        els('btn-team-status').onclick = showTeamStatus;
 
         // Team admin
         els('btn-reset-pass').onclick = async ()=>{

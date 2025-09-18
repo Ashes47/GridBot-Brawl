@@ -329,3 +329,40 @@ async def get_team_status(
         "status_summary": status_summary,
         "recent_teams": teams
     }
+
+
+@router.post("/test-all-teams")
+async def test_all_teams(
+    x_admin_token: str | None = Header(None),
+):
+    """Test all teams against baselines and update their status."""
+    if not x_admin_token or x_admin_token != os.getenv("ADMIN_TOKEN"):
+        raise HTTPException(status_code=403, detail="admin token required")
+    
+    from ..tasks import validate_all_teams
+    task = validate_all_teams.apply_async(queue="baseline")
+    return {"status": "queued", "task_id": task.id, "message": "Testing all teams against baselines..."}
+
+
+@router.get("/test-status/{task_id}")
+async def get_test_status(
+    task_id: str,
+    x_admin_token: str | None = Header(None),
+):
+    """Get the status of a team testing task."""
+    if not x_admin_token or x_admin_token != os.getenv("ADMIN_TOKEN"):
+        raise HTTPException(status_code=403, detail="admin token required")
+    
+    from celery.result import AsyncResult
+    from ..celery_app import celery_app
+    
+    result = AsyncResult(task_id, app=celery_app)
+    
+    if result.state == "PENDING":
+        return {"status": "pending", "message": "Task is waiting to be processed..."}
+    elif result.state == "PROGRESS":
+        return {"status": "progress", "message": "Task is being processed...", "current": result.info.get("current", 0), "total": result.info.get("total", 0)}
+    elif result.state == "SUCCESS":
+        return {"status": "success", "message": "All teams tested successfully!", "result": result.result}
+    else:
+        return {"status": "failed", "message": "Task failed", "error": str(result.info)}
