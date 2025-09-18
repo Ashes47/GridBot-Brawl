@@ -400,6 +400,8 @@ async def get_team(team_id: str, session: AsyncSession = Depends(get_session)):
         "members": [m.name for m in team.members],
         "roster": (_json.loads(team.roster) if team.roster else None),
         "status": getattr(team, 'status', 'pending'),  # Include team status
+        "last_validated": getattr(team, 'last_validated', None),
+        "last_error": getattr(team, 'last_error', None),
     }
 
 
@@ -433,6 +435,8 @@ async def list_teams(search: str | None = None, limit: int = 100, session: Async
             "created_at": r.created_at,
             "member_count": r.mc,
             "status": getattr(r, 'status', 'pending'),
+            "last_validated": getattr(r, 'last_validated', None),
+            "last_error": getattr(r, 'last_error', None),
         }
         for r in rows
     ]

@@ -193,10 +193,10 @@ def run_match(self, match_id: str, team_ids: List[str], queue_id: str | None = N
 
 @celery_app.task(name="app.tasks.validate_team_code")
 def validate_team_code(team_id: str) -> dict:
-    """Validate a team's code by checking if it exists and is readable."""
+    """Validate a team's code by checking syntax and running a test match against baseline."""
     from datetime import datetime
-    from pathlib import Path
     import ast
+    import traceback
     
     with SessionLocal() as session:
         # Get team info
@@ -208,70 +208,115 @@ def validate_team_code(team_id: str) -> dict:
         session.execute(
             update(Team)
             .where(Team.id == uuid.UUID(team_id))
-            .values(status="testing")
+            .values(status="testing", last_validated=datetime.utcnow())
         )
         session.commit()
         
         try:
-            # Check if team code file exists and is readable
-            code_path = Path(team.code_path)
-            if not code_path.exists():
-                session.execute(
-                    update(Team)
-                    .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid", last_error="Code file not found")
-                )
-                session.commit()
-                return {"status": "error", "message": "Code file not found"}
-            
-            # Try to read and parse the code
+            # Step 1: Check Python syntax by parsing the file
             try:
-                code_content = code_path.read_text(encoding="utf-8")
-                # Basic syntax check
-                ast.parse(code_content)
+                with open(team.code_path, 'r') as f:
+                    code_content = f.read()
                 
-                # Check if it has basic bot structure (has a Bot class)
-                if "class Bot" in code_content or "def " in code_content:
-                    # Mark as valid
-                    session.execute(
-                        update(Team)
-                        .where(Team.id == uuid.UUID(team_id))
-                        .values(status="valid", last_error=None)
-                    )
-                    session.commit()
-                    return {"status": "success", "message": "Team code validated successfully"}
-                else:
-                    session.execute(
-                        update(Team)
-                        .where(Team.id == uuid.UUID(team_id))
-                        .values(status="invalid", last_error="No Bot class or functions found")
-                    )
-                    session.commit()
-                    return {"status": "error", "message": "No Bot class or functions found"}
-                    
+                # Parse the code to check for syntax errors
+                ast.parse(code_content)
             except SyntaxError as e:
+                error_msg = f"Syntax error in team code: {str(e)}"
                 session.execute(
                     update(Team)
                     .where(Team.id == uuid.UUID(team_id))
-                    .values(status="invalid", last_error=f"Syntax error: {str(e)}")
+                    .values(status="invalid", last_error=error_msg)
                 )
                 session.commit()
-                return {"status": "error", "message": f"Syntax error: {str(e)}"}
+                return {"status": "error", "message": error_msg}
+            except Exception as e:
+                error_msg = f"Error reading team code file: {str(e)}"
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="invalid", last_error=error_msg)
+                )
+                session.commit()
+                return {"status": "error", "message": error_msg}
+            
+            # Step 2: Try to import the module to catch import errors
+            try:
+                import importlib.util
+                import sys
+                from pathlib import Path
+                
+                spec = importlib.util.spec_from_file_location("team_bot", team.code_path)
+                if spec is None or spec.loader is None:
+                    raise ImportError("Could not load module spec")
+                
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                
+                # Check if required classes exist
+                required_classes = ['Bot']
+                missing_classes = []
+                for cls_name in required_classes:
+                    if not hasattr(module, cls_name):
+                        missing_classes.append(cls_name)
+                
+                if missing_classes:
+                    error_msg = f"Missing required classes: {', '.join(missing_classes)}"
+                    session.execute(
+                        update(Team)
+                        .where(Team.id == uuid.UUID(team_id))
+                        .values(status="invalid", last_error=error_msg)
+                    )
+                    session.commit()
+                    return {"status": "error", "message": error_msg}
+                
+            except Exception as e:
+                error_msg = f"Import error in team code: {str(e)}"
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="invalid", last_error=error_msg)
+                )
+                session.commit()
+                return {"status": "error", "message": error_msg}
+            
+            # Step 3: Run a quick test match against baseline
+            result = run_baseline_test(team_id, None)
+            
+            if result and "match_id" in result:
+                # Test passed - mark as valid
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="valid", last_error=None)
+                )
+                session.commit()
+                return {"status": "success", "message": "Team code validated successfully"}
+            else:
+                # Test failed
+                error_msg = "Team code failed baseline test"
+                session.execute(
+                    update(Team)
+                    .where(Team.id == uuid.UUID(team_id))
+                    .values(status="invalid", last_error=error_msg)
+                )
+                session.commit()
+                return {"status": "error", "message": error_msg}
                 
         except Exception as exc:
             # Mark as invalid with error message
+            error_msg = f"Validation failed: {str(exc)}"
             session.execute(
                 update(Team)
                 .where(Team.id == uuid.UUID(team_id))
-                .values(status="invalid", last_error=str(exc))
+                .values(status="invalid", last_error=error_msg)
             )
             session.commit()
-            return {"status": "error", "message": f"Validation failed: {str(exc)}"}
+            return {"status": "error", "message": error_msg}
 
 
 @celery_app.task(name="app.tasks.validate_all_teams")
 def validate_all_teams() -> dict:
-    """Validate all teams by checking their code files."""
+    """Validate all teams by testing them against baselines."""
     with SessionLocal() as session:
         # Get all teams except baselines
         teams = session.execute(
@@ -281,7 +326,6 @@ def validate_all_teams() -> dict:
         
         results = {"validated": 0, "invalid": 0, "errors": 0}
         
-        # Process each team directly (simpler approach)
         for team_id, team_name in teams:
             try:
                 result = validate_team_code(str(team_id))
@@ -289,8 +333,7 @@ def validate_all_teams() -> dict:
                     results["validated"] += 1
                 else:
                     results["invalid"] += 1
-            except Exception as e:
-                print(f"Validation failed for team {team_name}: {e}")
+            except Exception:
                 results["errors"] += 1
         
         return results

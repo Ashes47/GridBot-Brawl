@@ -239,8 +239,19 @@
           statusBadge.className = 'pill';
           statusBadge.textContent = it.status || 'pending';
           statusBadge.style.background = getStatusColor(it.status);
+          statusBadge.title = it.last_error || ''; // Show error on hover
           left.innerHTML = `${it.name} `;
           left.appendChild(statusBadge);
+          
+          // Add error indicator for invalid teams
+          if(it.status === 'invalid' && it.last_error) {
+            const errorIcon = document.createElement('span');
+            errorIcon.textContent = '⚠️';
+            errorIcon.title = it.last_error;
+            errorIcon.style.marginLeft = '5px';
+            left.appendChild(errorIcon);
+          }
+          
           const right = document.createElement('div');
           const pick = document.createElement('button');
           pick.textContent = 'Select';
@@ -333,8 +344,19 @@
             statusBadge.className = 'pill';
             statusBadge.textContent = team.status;
             statusBadge.style.background = getStatusColor(team.status);
+            statusBadge.title = team.last_error || '';
             li.innerHTML = `${team.name} `;
             li.appendChild(statusBadge);
+            
+            // Add error indicator for invalid teams
+            if(team.status === 'invalid' && team.last_error) {
+              const errorIcon = document.createElement('span');
+              errorIcon.textContent = '⚠️';
+              errorIcon.title = team.last_error;
+              errorIcon.style.marginLeft = '5px';
+              li.appendChild(errorIcon);
+            }
+            
             recentList.appendChild(li);
           });
           
