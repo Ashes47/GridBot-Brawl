@@ -74,6 +74,24 @@ async def reset_team(team_id: str, x_admin_token: str | None = Header(None)):
     return {"status": "queued", "task_id": out.id}
 
 
+@router.post("/scheduler/queue_more/{team_id}")
+async def queue_more_matches(
+    team_id: str, 
+    count: int = 5,
+    mode: str = "duo",
+    x_admin_token: str | None = Header(None)
+):
+    """Queue additional matches for a specific team."""
+    require_admin(x_admin_token)
+    
+    from ..tasks import queue_more_matches_for_team
+    task = queue_more_matches_for_team.apply_async(
+        args=[team_id, count, mode], 
+        queue="simulation"
+    )
+    return {"status": "queued", "task_id": task.id, "message": f"Queued {count} {mode} matches for team"}
+
+
 @router.post("/leaderboard/re-evaluate")
 async def leaderboard_re_evaluate_admin(x_admin_token: str | None = Header(None)):
     """Reset all matches/queue/ratings and re-enqueue calibration for all teams (admin). Also cleans data/matches."""

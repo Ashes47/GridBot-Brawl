@@ -117,6 +117,7 @@
           <p class="desc">- <strong>Run Ongoing Scheduler</strong>: Schedules matches for teams per current policy.<br>
             - <strong>Consume One Queue Cycle</strong>: Run one pass of the queue consumer to pop/advance jobs.<br>
             - <strong>Calibrate Selected Team</strong>: Enqueue matchup calibration for the selected team.<br>
+            - <strong>Queue More Matches</strong>: Add more matches to the queue for the selected team.<br>
             - <strong>Reset Selected Team</strong>: Clear its matches/ratings, delete logs, and recalibrate.</p>
           <div class="row" style="margin-top:8px;">
             <button id="btn-ongoing">Run Ongoing Scheduler</button>
@@ -124,6 +125,9 @@
           </div>
           <div class="row" style="margin-top:8px;">
             <button id="btn-calibrate">Calibrate Selected Team</button>
+            <button id="btn-queue-more">Queue More Matches</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
             <button id="btn-reset-team" class="danger">Reset Selected Team</button>
           </div>
           <div class="muted" id="sched-status"></div>
@@ -206,6 +210,7 @@
         testTeam: (teamId)=>`http://localhost:8000/admin/validate-team/${teamId}`,
         teamStatus: 'http://localhost:8000/admin/team-status',
         testStatus: (taskId)=>`http://localhost:8000/admin/test-status/${taskId}`,
+        queueMore: (teamId, count, mode)=>`http://localhost:8000/admin/scheduler/queue_more/${teamId}?count=${count}&mode=${mode}`,
       };
 
       const els = (id)=>document.getElementById(id);
@@ -319,6 +324,26 @@
         }
       }
 
+      async function queueMoreMatches(){
+        if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
+        
+        const count = prompt('How many matches to queue?', '5');
+        if(!count || isNaN(count) || count < 1) return;
+        
+        const mode = prompt('Mode (duo/quad)?', 'duo');
+        if(!mode || !['duo', 'quad'].includes(mode)) return;
+        
+        try {
+          setStatus('sched-status', 'Queuing more matches...');
+          const response = await fetch(api.queueMore(SELECTED_TEAM_ID, count, mode), { method: 'POST', headers: headers() });
+          if(!response.ok) throw new Error(await response.text());
+          const data = await response.json();
+          setStatus('sched-status', data.message || `Queued ${count} ${mode} matches`);
+        } catch(e) {
+          setStatus('sched-status', 'Failed: ' + e.message);
+        }
+      }
+
       async function showTeamStatus(){
         try {
           setStatus('test-status', 'Loading team status...');
@@ -421,6 +446,7 @@
           if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
           try { setStatus('sched-status','Queuing calibration…'); await doPost(api.schedCalibrate(SELECTED_TEAM_ID)); setStatus('sched-status','Queued'); } catch(e){ setStatus('sched-status','Failed'); alert(e.message); }
         };
+        els('btn-queue-more').onclick = queueMoreMatches;
         els('btn-reset-team').onclick = async ()=>{
           if(!SELECTED_TEAM_ID){ alert('Select a team first'); return; }
           if(!confirm('This will delete the team\'s matches, logs, and ratings, then recalibrate. Continue?')) return;

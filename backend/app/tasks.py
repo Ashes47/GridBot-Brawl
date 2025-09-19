@@ -271,6 +271,58 @@ def validate_all_teams() -> dict:
         return results
 
 
+@celery_app.task(name="app.tasks.queue_more_matches_for_team")
+def queue_more_matches_for_team(team_id: str, count: int = 5, mode: str = "duo") -> dict:
+    """Queue additional matches for a specific team against random opponents."""
+    from sqlalchemy import and_
+    import random
+    
+    with SessionLocal() as session:
+        # Get the target team
+        team = session.get(Team, uuid.UUID(team_id))
+        if not team:
+            return {"status": "error", "message": "Team not found"}
+        
+        # Get all other valid teams (excluding baselines and the target team)
+        other_teams = session.execute(
+            select(Team.id, Team.name)
+            .where(
+                and_(
+                    Team.id != uuid.UUID(team_id),
+                    Team.name.notlike("baseline%"),
+                    Team.status == "valid"
+                )
+            )
+        ).all()
+        
+        if not other_teams:
+            return {"status": "error", "message": "No valid opponents found"}
+        
+        queued_matches = 0
+        
+        for _ in range(count):
+            # Pick a random opponent
+            opponent_id, opponent_name = random.choice(other_teams)
+            
+            # Create match queue entry
+            match_queue = MatchQueue(
+                mode=mode,
+                team_ids=[uuid.UUID(team_id), opponent_id],
+                priority="normal",
+                status="queued"
+            )
+            session.add(match_queue)
+            queued_matches += 1
+        
+        session.commit()
+        
+        return {
+            "status": "success", 
+            "message": f"Queued {queued_matches} {mode} matches for {team.name}",
+            "queued_matches": queued_matches
+        }
+
+
 @celery_app.task(name="app.tasks.run_baseline_test")
 def run_baseline_test(team_id: str, baseline_roster: List[str] | None = None) -> dict:
     """Create baseline team if needed, create Match, and enqueue run_match on baseline queue.
